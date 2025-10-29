@@ -1,0 +1,45 @@
+=========================================
+  THÔNG TIN TÀI KHOẢN ADMIN
+  HỆ THỐNG HƠI THỞ XANH
+=========================================
+
+📧 EMAIL: admin@hoithoxanh.com
+🔑 PASSWORD: admin123456
+
+----------------------------------------
+
+📝 LƯU Ý:
+- Đây là tài khoản admin mặc định
+- Sử dụng để đăng nhập vào Admin Dashboard
+- URL: http://localhost:3000/admin/login
+
+----------------------------------------
+
+🚀 HƯỚNG DẪN SỬ DỤNG:
+
+1. Mở trình duyệt và vào: http://localhost:3000/admin/login
+2. Nhập thông tin:
+   - Email: admin@hoithoxanh.com
+   - Password: admin123456
+3. Click "Đăng nhập"
+4. Sẽ được chuyển đến Admin Dashboard
+
+----------------------------------------
+
+✨ CÁC TÍNH NĂNG TRONG ADMIN:
+- Dashboard: Xem thống kê tổng quan
+- Sản phẩm: Quản lý sản phẩm (CRUD)
+- Đơn hàng: Xem và cập nhật trạng thái đơn hàng
+- Người dùng: Quản lý tài khoản người dùng
+- Mã giảm giá: Tạo và quản lý coupons
+- Liên hệ: Xem tin nhắn liên hệ
+- Cài đặt: Cấu hình hệ thống
+
+=========================================
+  ⚠️ BẢO MẬT:
+  
+  - Đổi mật khẩu ngay sau lần đăng nhập đầu tiên
+  - Không chia sẻ thông tin này cho người khác
+  - Sử dụng mật khẩu mạnh trong môi trường production
+=========================================
+
