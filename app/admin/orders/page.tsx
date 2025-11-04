@@ -28,6 +28,7 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -141,8 +142,9 @@ export default function AdminOrdersPage() {
       order.phone.includes(searchQuery);
     
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    const matchesPayment = paymentFilter === "all" || order.payment_status === paymentFilter;
     
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesPayment;
   });
 
   if (loading) {
@@ -176,14 +178,15 @@ export default function AdminOrdersPage() {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <div className="text-xs font-semibold text-gray-500 uppercase flex items-center mr-2">Đơn hàng:</div>
           {["all", "pending", "processing", "shipped", "delivered", "cancelled"].map((status) => (
             <motion.button
               key={status}
               onClick={() => setStatusFilter(status)}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
                 statusFilter === status
                   ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg"
                   : "bg-white border-2 border-gray-200 text-gray-700 hover:border-sky-300"
@@ -193,6 +196,36 @@ export default function AdminOrdersPage() {
             </motion.button>
           ))}
         </div>
+      </div>
+
+      <div className="flex gap-2 flex-wrap items-center">
+        <div className="text-xs font-semibold text-gray-500 uppercase flex items-center mr-2">Thanh toán:</div>
+        {[
+          { value: "all", label: "Tất cả" },
+          { value: "paid", label: "✓ Đã thanh toán" },
+          { value: "pending", label: "⏳ Chờ thanh toán" },
+          { value: "failed", label: "✗ Thất bại" },
+        ].map((payment) => (
+          <motion.button
+            key={payment.value}
+            onClick={() => setPaymentFilter(payment.value)}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+              paymentFilter === payment.value
+                ? payment.value === "paid"
+                  ? "bg-green-500 text-white shadow-lg"
+                  : payment.value === "pending"
+                  ? "bg-yellow-500 text-white shadow-lg"
+                  : payment.value === "failed"
+                  ? "bg-red-500 text-white shadow-lg"
+                  : "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg"
+                : "bg-white border-2 border-gray-200 text-gray-700 hover:border-sky-300"
+            }`}
+          >
+            {payment.label}
+          </motion.button>
+        ))}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -210,7 +243,13 @@ export default function AdminOrdersPage() {
                   Tổng tiền
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Trạng thái
+                  Phương thức
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  TT Thanh toán
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Trạng thái ĐH
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Ngày đặt
@@ -223,7 +262,7 @@ export default function AdminOrdersPage() {
             <tbody className="divide-y divide-gray-200">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <ShoppingBag className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                     <p className="text-gray-500">Chưa có đơn hàng nào</p>
                   </td>
@@ -247,6 +286,28 @@ export default function AdminOrdersPage() {
                       <div className="font-bold text-gray-900">
                         {new Intl.NumberFormat('vi-VN').format(order.final_amount)}đ
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
+                        order.payment_method === 'cod' 
+                          ? 'bg-orange-100 text-orange-800 border border-orange-200' 
+                          : 'bg-blue-100 text-blue-800 border border-blue-200'
+                      }`}>
+                        {order.payment_method === 'cod' ? 'COD' : 'Chuyển khoản'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
+                        order.payment_status === 'paid' 
+                          ? 'bg-green-100 text-green-800 border border-green-200' 
+                          : order.payment_status === 'pending'
+                          ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                          : 'bg-red-100 text-red-800 border border-red-200'
+                      }`}>
+                        {order.payment_status === 'paid' ? '✓ Đã thanh toán' : 
+                         order.payment_status === 'pending' ? '⏳ Chờ thanh toán' : 
+                         '✗ Thất bại'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <select
@@ -317,22 +378,22 @@ export default function AdminOrdersPage() {
               {/* Modal Content */}
               <div className="p-6 space-y-6">
                 {/* Order Status */}
-                <div className="flex items-center justify-between">
+                <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-600">Trạng thái đơn hàng</p>
+                    <p className="text-sm text-gray-600 mb-2">Trạng thái đơn hàng</p>
                     <select
                       value={selectedOrder.status}
                       onChange={(e) => updateOrderStatus(selectedOrder.id, e.target.value)}
-                      className={`mt-1 px-4 py-2 rounded-lg text-sm font-semibold border-2 ${statusColors[selectedOrder.status]} cursor-pointer focus:outline-none focus:ring-2`}
+                      className={`w-full px-4 py-2 rounded-lg text-sm font-semibold border-2 ${statusColors[selectedOrder.status]} cursor-pointer focus:outline-none focus:ring-2`}
                     >
                       {Object.entries(statusLabels).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600">Ngày đặt</p>
-                    <p className="text-lg font-semibold text-gray-900">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-2">Ngày đặt hàng</p>
+                    <p className="text-lg font-semibold text-gray-900 px-4 py-2 bg-gray-50 rounded-lg">
                       {new Date(selectedOrder.created_at).toLocaleDateString('vi-VN', {
                         year: 'numeric',
                         month: 'long',
@@ -342,6 +403,46 @@ export default function AdminOrdersPage() {
                       })}
                     </p>
                   </div>
+                </div>
+
+                {/* Payment Information */}
+                <div className="bg-gradient-to-br from-blue-50 to-sky-50 rounded-xl p-6 border-2 border-blue-100">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-blue-600" />
+                    Thông tin thanh toán
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600 mb-2">Phương thức thanh toán</p>
+                      <span className={`inline-flex px-4 py-2 rounded-lg text-sm font-semibold ${
+                        selectedOrder.payment_method === 'cod' 
+                          ? 'bg-orange-100 text-orange-800 border-2 border-orange-200' 
+                          : 'bg-blue-100 text-blue-800 border-2 border-blue-200'
+                      }`}>
+                        {selectedOrder.payment_method === 'cod' ? '💵 Thanh toán khi nhận hàng (COD)' : '🏦 Chuyển khoản ngân hàng'}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 mb-2">Trạng thái thanh toán</p>
+                      <span className={`inline-flex px-4 py-2 rounded-lg text-sm font-semibold ${
+                        selectedOrder.payment_status === 'paid' 
+                          ? 'bg-green-100 text-green-800 border-2 border-green-200' 
+                          : selectedOrder.payment_status === 'pending'
+                          ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-200'
+                          : 'bg-red-100 text-red-800 border-2 border-red-200'
+                      }`}>
+                        {selectedOrder.payment_status === 'paid' ? '✓ Đã thanh toán' : 
+                         selectedOrder.payment_status === 'pending' ? '⏳ Chờ thanh toán' : 
+                         '✗ Thanh toán thất bại'}
+                      </span>
+                    </div>
+                  </div>
+                  {selectedOrder.transaction_id && (
+                    <div className="mt-4 pt-4 border-t border-blue-200">
+                      <p className="text-sm text-gray-600">Mã giao dịch</p>
+                      <p className="font-mono text-sm font-semibold text-gray-900 mt-1">{selectedOrder.transaction_id}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Customer Information */}
