@@ -42,6 +42,7 @@ export async function POST(request: Request) {
         user_id: user.id,
         order_number: orderNumber,
         status: 'pending',
+        payment_status: paymentMethod === 'cod' ? 'pending' : 'pending', // Mặc định là pending cho tất cả
         total_amount: totalAmount,
         shipping_fee: shippingFee,
         discount_amount: discountAmount,
