@@ -238,7 +238,7 @@ export default function CustomerServicePage() {
         return;
       }
 
-      const productIds = [...new Set(orderItems.map(item => item.product_id))];
+      const productIds = Array.from(new Set(orderItems.map(item => item.product_id)));
       const { data: products } = await supabase
         .from('products')
         .select('*')
