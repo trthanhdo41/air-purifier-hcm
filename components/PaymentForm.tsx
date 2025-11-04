@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CreditCard, Smartphone, Wallet, Building2, Shield, Lock } from "lucide-react";
+import { CreditCard, Smartphone, Wallet, Building2, Shield, Lock, Banknote, QrCode, CheckCircle } from "lucide-react";
 
 interface PaymentFormProps {
   paymentMethod: string;
@@ -22,8 +22,8 @@ export default function PaymentForm({ paymentMethod, onPaymentMethodChange }: Pa
       id: "sepay",
       name: "Thanh toán online - Chuyển khoản",
       description: "Thanh toán qua QR Code hoặc chuyển khoản ngân hàng",
-      icon: CreditCard,
-      color: "bg-emerald-600",
+      icon: Building2,
+      color: "bg-gradient-to-br from-blue-500 to-sky-600",
       popular: true
     }
   ];
@@ -106,31 +106,54 @@ export default function PaymentForm({ paymentMethod, onPaymentMethodChange }: Pa
                 height: paymentMethod === method.id ? "auto" : 0 
               }}
               transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="mt-3 pt-3 border-t border-gray-200 overflow-hidden"
+              className="mt-3 pt-3 border-t border-sky-100 overflow-hidden"
             >
-              <div className="space-y-2 text-xs text-gray-600">
-                <p className="font-semibold text-gray-900">Thanh toán online:</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex items-center gap-1 text-emerald-600">
-                    <Shield className="w-3 h-3" />
-                    <span>Thanh toán nhanh chóng</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-emerald-600">
-                    <Lock className="w-3 h-3" />
-                    <span>Bảo mật SSL</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-emerald-600">
-                    <CreditCard className="w-3 h-3" />
-                    <span>QR Code</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-emerald-600">
-                    <Wallet className="w-3 h-3" />
-                    <span>Tự động xác nhận</span>
+              <div className="space-y-3">
+                <div className="bg-gradient-to-r from-blue-50 to-sky-50 rounded-lg p-3 border border-blue-100">
+                  <p className="font-semibold text-blue-900 mb-2 text-sm flex items-center gap-2">
+                    <QrCode className="w-4 h-4" />
+                    Quy trình thanh toán:
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2 text-xs text-gray-700">
+                      <div className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">1</div>
+                      <span>Xác nhận đơn hàng và bấm <strong>"Đặt hàng"</strong></span>
+                    </div>
+                    <div className="flex items-start gap-2 text-xs text-gray-700">
+                      <div className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">2</div>
+                      <span>Hệ thống tạo <strong>mã QR thanh toán</strong> riêng cho đơn hàng</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-xs text-gray-700">
+                      <div className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">3</div>
+                      <span>Bạn quét <strong>QR Code</strong> bằng app ngân hàng để thanh toán</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-xs text-gray-700">
+                      <div className="w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                        <CheckCircle className="w-3 h-3" />
+                      </div>
+                      <span>Đơn hàng <strong>tự động xác nhận</strong> sau khi thanh toán thành công</span>
+                    </div>
                   </div>
                 </div>
-                <p className="text-emerald-700 mt-2">
-                  Sau khi đặt hàng, bạn sẽ được chuyển đến trang thanh toán an toàn.
-                </p>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-1.5 text-xs text-blue-600">
+                    <Shield className="w-3.5 h-3.5" />
+                    <span className="font-medium">Bảo mật SSL 256-bit</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-blue-600">
+                    <Lock className="w-3.5 h-3.5" />
+                    <span className="font-medium">An toàn tuyệt đối</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-blue-600">
+                    <Banknote className="w-3.5 h-3.5" />
+                    <span className="font-medium">Không phí giao dịch</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-blue-600">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span className="font-medium">Xác nhận tức thì</span>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
