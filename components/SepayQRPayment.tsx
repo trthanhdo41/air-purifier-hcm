@@ -64,11 +64,14 @@ export default function SepayQRPayment({
         const res = await fetch(`/api/payment/sepay/check?orderCode=${orderCode}`);
         const data = await res.json();
         
-        if (data.success && data.paid) {
+        console.log('💳 Payment check result:', data);
+        
+        if (data.success && data.isPaid) {
+          console.log('✅ Payment confirmed! Redirecting...');
           onSuccess?.();
         }
       } catch (error) {
-        console.error('Error checking payment:', error);
+        console.error('❌ Error checking payment:', error);
       } finally {
         setCheckingPayment(false);
       }
