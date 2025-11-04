@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  * Response:
  * {
  *   success: boolean,
- *   paid: boolean,
+ *   isPaid: boolean,
  *   order?: object
  * }
  */
@@ -39,18 +39,25 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (error || !order) {
+      console.log('❌ Order not found:', orderCode, error?.message);
       return NextResponse.json({
         success: true,
-        paid: false,
+        isPaid: false,
       });
     }
 
     // Check nếu đã thanh toán
-    const isPaid = order.payment_status === 'success' || order.status === 'Đã thanh toán';
+    const isPaid = order.payment_status === 'paid';
+
+    console.log('✅ Order found:', {
+      orderCode,
+      payment_status: order.payment_status,
+      isPaid,
+    });
 
     return NextResponse.json({
       success: true,
-      paid: isPaid,
+      isPaid,
       order: isPaid ? order : null,
     });
 
