@@ -214,11 +214,6 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Clear buy now items if used
-      if (buyNowItems.length > 0) {
-        clearBuyNowItems();
-      }
-
             // Handle payment method
             if (formData.paymentMethod === 'sepay') {
               setIsProcessingPayment(true);
@@ -255,7 +250,10 @@ export default function CheckoutPage() {
               }
             }
 
-            // For COD, redirect to success page
+            // For COD, clear cart and redirect to success page
+            if (buyNowItems.length > 0) {
+              clearBuyNowItems();
+            }
             router.push(`/success?order=${orderData.order.order_number}`);
     } catch (error: any) {
       console.error('Error submitting order:', error);
@@ -679,6 +677,10 @@ export default function CheckoutPage() {
           bankName={sepayQRData.bankName}
           onSuccess={() => {
             setShowSepayQR(false);
+            // Clear cart after successful payment
+            if (buyNowItems.length > 0) {
+              clearBuyNowItems();
+            }
             router.push(`/success?order=${sepayQRData.orderCode}`);
           }}
           onCancel={() => {
