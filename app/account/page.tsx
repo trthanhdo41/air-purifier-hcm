@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import Botchat from "@/components/Botchat";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useRouter } from "next/navigation";
 import AddressSelector from "@/components/AddressSelector";
@@ -30,6 +31,10 @@ export default function AccountPage() {
     setIsClient(true);
     if (!user) {
       router.push("/");
+      return;
+    }
+    if (user && user.email === 'admin@hoithoxanh.com') {
+      router.push('/admin/dashboard');
       return;
     }
     setFormData({
@@ -209,6 +214,7 @@ export default function AccountPage() {
       </main>
       
       <Footer />
+      <Botchat />
     </div>
   );
 }

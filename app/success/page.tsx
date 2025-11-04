@@ -2,57 +2,73 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle, Truck, Package, Home, Sparkles, Gift, Shield } from "lucide-react";
+import { CheckCircle, Truck, Package, Home } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 
 export default function SuccessPage() {
   const [showConfetti, setShowConfetti] = useState(false);
+  const [orderNumber, setOrderNumber] = useState<string>("");
 
   useEffect(() => {
     setShowConfetti(true);
     const timer = setTimeout(() => setShowConfetti(false), 3000);
+    
+    // Get order number from URL params
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const orderParam = params.get('order');
+      if (orderParam) {
+        setOrderNumber(orderParam);
+      }
+    }
+    
     return () => clearTimeout(timer);
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Confetti Animation */}
-      {showConfetti && (
-        <div className="absolute inset-0 pointer-events-none">
-          {[...Array(50)].map((_, i) => (
-            <motion.div
-              key={i}
-              initial={{ 
-                x: Math.random() * window.innerWidth,
-                y: -10,
-                rotate: 0,
-                scale: 1
-              }}
-              animate={{ 
-                y: window.innerHeight + 10,
-                rotate: 360,
-                scale: 0
-              }}
-              transition={{ 
-                duration: 3,
-                delay: Math.random() * 2,
-                ease: "easeOut"
-              }}
-              className="absolute w-2 h-2 rounded-full"
-              style={{
-                backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'][Math.floor(Math.random() * 5)]
-              }}
-            />
-          ))}
-        </div>
-      )}
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex flex-col">
+      <Header />
+      <div className="flex-1 flex justify-center py-6 sm:py-8 px-4 relative overflow-hidden">
+        {/* Confetti Animation */}
+        {showConfetti && (
+          <div className="absolute inset-0 pointer-events-none z-10">
+            {[...Array(50)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{ 
+                  x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000),
+                  y: -10,
+                  rotate: 0,
+                  scale: 1
+                }}
+                animate={{ 
+                  y: (typeof window !== 'undefined' ? window.innerHeight : 800) + 10,
+                  rotate: 360,
+                  scale: 0
+                }}
+                transition={{ 
+                  duration: 3,
+                  delay: Math.random() * 2,
+                  ease: "easeOut"
+                }}
+                className="absolute w-2 h-2 rounded-full"
+                style={{
+                  backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'][Math.floor(Math.random() * 5)]
+                }}
+              />
+            ))}
+          </div>
+        )}
 
-      <motion.div
+        <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
-        className="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl w-full text-center relative overflow-hidden"
+        className="bg-white rounded-3xl shadow-lg p-6 sm:p-8 max-w-2xl w-full text-center relative overflow-hidden"
+        style={{ boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}
       >
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
@@ -110,7 +126,7 @@ export default function SuccessPage() {
                 </div>
                 <div className="text-left">
                   <p className="font-semibold text-gray-900">Mã đơn hàng</p>
-                  <p className="text-gray-600">#DH2024001</p>
+                  <p className="text-gray-600">{orderNumber ? `#${orderNumber}` : 'Đang tải...'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -163,7 +179,7 @@ export default function SuccessPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center"
+            className="flex justify-center"
           >
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button asChild className="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 px-8 py-3">
@@ -173,41 +189,11 @@ export default function SuccessPage() {
                 </Link>
               </Button>
             </motion.div>
-            
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button variant="outline" className="px-8 py-3 border-gray-300 hover:border-sky-400 hover:text-sky-600">
-                <span>Xem đơn hàng</span>
-              </Button>
-            </motion.div>
-          </motion.div>
-
-          {/* Special Offers */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.2 }}
-            className="mt-8 bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-2xl p-6"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <motion.div
-                animate={{ rotate: [0, 10, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center"
-              >
-                <Gift className="w-5 h-5 text-orange-600" />
-              </motion.div>
-              <h3 className="text-lg font-bold text-orange-800">Ưu đãi đặc biệt</h3>
-            </div>
-            <p className="text-orange-700 mb-4">
-              Nhân dịp đặt hàng thành công, bạn được tặng mã giảm giá 10% cho đơn hàng tiếp theo!
-            </p>
-            <div className="bg-white rounded-lg p-3 border border-orange-200">
-              <p className="font-mono text-lg font-bold text-orange-600">SAVE10NOW</p>
-              <p className="text-sm text-orange-600">Mã giảm giá có hiệu lực trong 30 ngày</p>
-            </div>
           </motion.div>
         </div>
-      </motion.div>
+        </motion.div>
+      </div>
+      <Footer />
     </div>
   );
 }

@@ -6,12 +6,24 @@ import Image from "next/image";
 import { useCartStore } from "@/lib/stores/cart";
 import { formatPrice } from "@/lib/utils";
 
-export default function OrderSummary() {
-  const { items, getTotalItems, getTotalPrice, getTotalSavings } = useCartStore();
+interface OrderSummaryProps {
+  items?: import('@/lib/stores/cart').CartItem[];
+}
+
+export default function OrderSummary({ items: propItems }: OrderSummaryProps) {
+  const { items: storeItems, getTotalItems, getTotalPrice, getTotalSavings } = useCartStore();
   
-  const totalItems = getTotalItems();
-  const totalPrice = getTotalPrice();
-  const totalSavings = getTotalSavings();
+  // Sử dụng propItems nếu có, không thì dùng storeItems
+  const items = propItems || storeItems;
+  
+  const totalItems = items.reduce((total, item) => total + item.quantity, 0);
+  const totalPrice = items.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+  const totalSavings = items.reduce((total, item) => {
+    if (item.product.originalPrice) {
+      return total + ((item.product.originalPrice - item.product.price) * item.quantity);
+    }
+    return total;
+  }, 0);
   const shippingThreshold = 2000000;
   const shippingFee = totalPrice >= shippingThreshold ? 0 : 50000;
   const finalTotal = totalPrice + shippingFee;
@@ -58,6 +70,7 @@ export default function OrderSummary() {
                   src={item.product.image}
                   alt={item.product.name}
                   fill
+                  sizes="(max-width: 640px) 48px, 64px"
                   className="object-cover"
                 />
                 {item.product.discount && (

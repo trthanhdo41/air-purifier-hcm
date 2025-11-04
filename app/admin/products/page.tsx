@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/utils";
 import Image from "next/image";
+import Toast from "@/components/Toast";
 
 interface Product {
   id: string;
@@ -25,8 +26,12 @@ interface Product {
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productList, setProductList] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     price: "",
@@ -36,7 +41,9 @@ export default function ProductsPage() {
     brand: "",
     stock: "",
     image: "",
+    images: [] as string[],
   });
+  const [uploadingImages, setUploadingImages] = useState(false);
   
   const filteredProducts = productList.filter(product => 
     product.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -44,6 +51,7 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, []);
 
   const fetchProducts = async () => {
@@ -55,16 +63,32 @@ export default function ProductsPage() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching products:', error);
-        alert('Lỗi khi tải sản phẩm: ' + error.message);
+        setToast({ message: 'Lỗi khi tải sản phẩm: ' + error.message, type: 'error' });
       } else {
         setProductList(data || []);
       }
     } catch (error) {
-      console.error('Error:', error);
-      alert('Lỗi khi tải sản phẩm');
+      setToast({ message: 'Lỗi khi tải sản phẩm', type: 'error' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching categories:', error);
+      } else {
+        setCategories(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
     }
   };
 
@@ -74,9 +98,17 @@ export default function ProductsPage() {
 
   const handleCreateProduct = async () => {
     if (!formData.name || !formData.price) {
-      alert("Vui lòng điền đầy đủ thông tin bắt buộc!");
+      setToast({ message: "Vui lòng điền đầy đủ thông tin bắt buộc!", type: 'error' });
       return;
     }
+
+    // Tạo mảng images: ưu tiên images array, nếu không có thì dùng image đơn, nếu không có thì dùng default
+    const imagesArray = formData.images.length > 0 
+      ? formData.images 
+      : formData.image 
+        ? [formData.image] 
+        : ["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTqcWbIqxD1gmh2l8psxDUx8A6osESPMx-J8Q&s"];
+    const primaryImage = imagesArray[0];
 
     try {
       const supabase = createClient();
@@ -87,7 +119,8 @@ export default function ProductsPage() {
           price: Number(formData.price),
           original_price: formData.originalPrice ? Number(formData.originalPrice) : null,
           discount: formData.discount ? Number(formData.discount) : null,
-          image: formData.image || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTqcWbIqxD1gmh2l8psxDUx8A6osESPMx-J8Q&s",
+          image: primaryImage,
+          images: imagesArray,
           category: formData.category || "may-loc-hepa",
           brand: formData.brand || "Unknown",
           stock: Number(formData.stock) || 0,
@@ -97,8 +130,7 @@ export default function ProductsPage() {
         .single();
 
       if (error) {
-        console.error('Error creating product:', error);
-        alert('Lỗi khi thêm sản phẩm: ' + error.message);
+        setToast({ message: 'Lỗi khi thêm sản phẩm: ' + error.message, type: 'error' });
         return;
       }
 
@@ -113,16 +145,86 @@ export default function ProductsPage() {
         brand: "",
         stock: "",
         image: "",
+        images: [],
       });
-      alert("Thêm sản phẩm thành công!");
+      setToast({ message: "Thêm sản phẩm thành công!", type: 'success' });
     } catch (error) {
-      console.error('Error:', error);
-      alert('Lỗi khi thêm sản phẩm');
+      setToast({ message: 'Lỗi khi thêm sản phẩm', type: 'error' });
     }
   };
 
   const handleEditProduct = (productId: string) => {
-    alert(`Chức năng edit sản phẩm ${productId} sẽ được cập nhật sớm!`);
+    const p = productList.find(x => x.id === productId);
+    if (!p) return;
+    setIsEditMode(true);
+    setEditingProductId(productId);
+    const productImages = (p as any).images && Array.isArray((p as any).images) && (p as any).images.length > 0
+      ? (p as any).images
+      : p.image
+        ? [p.image]
+        : [];
+    setFormData({
+      name: p.name || "",
+      price: String(p.price ?? ""),
+      originalPrice: String((p as any).original_price ?? ""),
+      discount: String((p as any).discount ?? ""),
+      category: String(p.category ?? ""),
+      brand: String(p.brand ?? ""),
+      stock: String(p.stock ?? ""),
+      image: String(p.image ?? ""),
+      images: productImages,
+    });
+    setShowModal(true);
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!editingProductId) return;
+    if (!formData.name || !formData.price) {
+      setToast({ message: "Vui lòng điền đầy đủ thông tin bắt buộc!", type: 'error' });
+      return;
+    }
+    
+    // Tạo mảng images: ưu tiên images array, nếu không có thì dùng image đơn
+    const imagesArray = formData.images.length > 0 
+      ? formData.images 
+      : formData.image 
+        ? [formData.image] 
+        : [];
+    const primaryImage = imagesArray.length > 0 ? imagesArray[0] : formData.image || null;
+    
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('products')
+        .update({
+          name: formData.name,
+          price: Number(formData.price),
+          original_price: formData.originalPrice ? Number(formData.originalPrice) : null,
+          discount: formData.discount ? Number(formData.discount) : null,
+          image: primaryImage,
+          images: imagesArray,
+          category: formData.category || null,
+          brand: formData.brand || null,
+          stock: Number(formData.stock) || 0,
+        })
+        .eq('id', editingProductId)
+        .select()
+        .single();
+
+      if (error) {
+        setToast({ message: 'Lỗi khi cập nhật sản phẩm: ' + error.message, type: 'error' });
+        return;
+      }
+
+      setProductList(prev => prev.map(p => p.id === editingProductId ? { ...p, ...data } : p));
+      setShowModal(false);
+      setIsEditMode(false);
+      setEditingProductId(null);
+      setFormData({ name: "", price: "", originalPrice: "", discount: "", category: "", brand: "", stock: "", image: "", images: [] });
+      setToast({ message: "Cập nhật sản phẩm thành công!", type: 'success' });
+    } catch (error) {
+      setToast({ message: 'Lỗi khi cập nhật sản phẩm', type: 'error' });
+    }
   };
 
   const handleDeleteProduct = async (productId: string) => {
@@ -138,16 +240,14 @@ export default function ProductsPage() {
         .eq('id', productId);
 
       if (error) {
-        console.error('Error deleting product:', error);
-        alert('Lỗi khi xóa sản phẩm: ' + error.message);
+        setToast({ message: 'Lỗi khi xóa sản phẩm: ' + error.message, type: 'error' });
         return;
       }
 
       setProductList(productList.filter(p => p.id !== productId));
-      alert("Đã xóa sản phẩm thành công!");
+      setToast({ message: "Đã xóa sản phẩm thành công!", type: 'success' });
     } catch (error) {
-      console.error('Error:', error);
-      alert('Lỗi khi xóa sản phẩm');
+      setToast({ message: 'Lỗi khi xóa sản phẩm', type: 'error' });
     }
   };
 
@@ -316,7 +416,7 @@ export default function ProductsPage() {
                 className="bg-white rounded-2xl shadow-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto pointer-events-auto"
               >
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Thêm sản phẩm mới</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">{isEditMode ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'}</h2>
                   <button
                     onClick={() => setShowModal(false)}
                     className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
@@ -393,14 +493,16 @@ export default function ProductsPage() {
                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-2 focus:ring-sky-100 outline-none"
                       >
-                        <option value="may-loc-hepa">Máy lọc HEPA</option>
-                        <option value="may-loc-ion">Máy lọc Ion</option>
-                        <option value="may-loc-carbon">Máy lọc Carbon</option>
-                        <option value="may-loc-uv">Máy lọc UV</option>
-                        <option value="may-loc-phong-nho">Phòng nhỏ</option>
-                        <option value="may-loc-phong-vua">Phòng vừa</option>
-                        <option value="may-loc-phong-lon">Phòng lớn</option>
-                        <option value="may-loc-khong-khi-thong-minh">Máy lọc thông minh</option>
+                        <option value="">Chọn danh mục</option>
+                        {categories.length > 0 ? (
+                          categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="" disabled>Đang tải danh mục...</option>
+                        )}
                       </select>
                     </div>
                   </div>
@@ -435,26 +537,91 @@ export default function ProductsPage() {
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Link hình ảnh (URL)
+                      Hình ảnh sản phẩm
                     </label>
-                    <input
-                      type="text"
-                      value={formData.image}
-                      onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-2 focus:ring-sky-100 outline-none"
-                      placeholder="https://..."
-                    />
+                    <div className="space-y-3">
+                      {/* Input URL cho từng ảnh */}
+                      <div className="space-y-2">
+                        {formData.images.map((img, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={img}
+                              onChange={(e) => {
+                                const newImages = [...formData.images];
+                                newImages[index] = e.target.value;
+                                setFormData({ ...formData, images: newImages, image: newImages[0] || formData.image });
+                              }}
+                              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-2 focus:ring-sky-100 outline-none"
+                              placeholder={`URL ảnh ${index + 1}...`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newImages = formData.images.filter((_, i) => i !== index);
+                                setFormData({ ...formData, images: newImages, image: newImages[0] || formData.image });
+                              }}
+                              className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* Nút thêm ảnh mới */}
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, images: [...formData.images, ""] })}
+                        className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-sky-500 hover:bg-sky-50 transition-colors text-gray-600 font-medium"
+                      >
+                        + Thêm ảnh mới
+                      </button>
+                      
+                      {/* Preview ảnh */}
+                      {formData.images.length > 0 && (
+                        <div className="grid grid-cols-4 gap-2 mt-3">
+                          {formData.images.map((img, index) => (
+                            img && (
+                              <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200">
+                                <Image
+                                  src={img}
+                                  alt={`Preview ${index + 1}`}
+                                  fill
+                                  className="object-cover"
+                                  sizes="(max-width: 768px) 25vw, 12.5vw"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            )
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Fallback: Input URL đơn (nếu không dùng array) */}
+                      {formData.images.length === 0 && (
+                        <input
+                          type="text"
+                          value={formData.image}
+                          onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-2 focus:ring-sky-100 outline-none"
+                          placeholder="URL ảnh chính hoặc nhấn 'Thêm ảnh mới' để thêm nhiều ảnh..."
+                        />
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex gap-3 pt-4">
                     <Button
-                      onClick={handleCreateProduct}
+                      onClick={isEditMode ? handleUpdateProduct : handleCreateProduct}
                       className="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white"
                     >
-                      Thêm sản phẩm
+                      {isEditMode ? 'Lưu thay đổi' : 'Thêm sản phẩm'}
                     </Button>
                     <Button
-                      onClick={() => setShowModal(false)}
+                      onClick={() => { setShowModal(false); setIsEditMode(false); setEditingProductId(null); }}
                       variant="outline"
                       className="flex-1"
                     >
@@ -467,6 +634,14 @@ export default function ProductsPage() {
           </>
         )}
       </AnimatePresence>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={3000}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,0 +1,292 @@
+===========================================
+    CẤU HÌNH SEPAY - HƠI THỞ XANH
+===========================================
+
+📌 THÔNG TIN TÀI KHOẢN HIỆN TẠI
+===========================================
+Tên công ty: TTĐ
+Tài khoản ngân hàng: VPBank - 0888889805 - TRẦN THANH ĐỘ
+Gói dịch vụ: VPBank PRO
+Dashboard: https://my.sepay.vn/
+
+📌 THÔNG TIN ĐÃ CẤU HÌNH
+===========================================
+
+1. WEBHOOK PRODUCTION
+   - ID: 17017
+   - Tên: hoithoxanh-production
+   - URL: https://air-purifier-hcm.vercel.app/api/payment/sepay/webhook
+   - Sự kiện: Có tiền vào
+   - TK ngân hàng: VPBank - 0888889805 - TRẦN THANH ĐỘ
+   - Bỏ qua nếu không có Code: Không
+   - Xác thực: Không cần chứng thực
+   - Content type: application/json
+   - Retry: HTTP Status Code không nằm trong 200-299
+   - Trạng thái: Kích hoạt ✅
+
+2. API ACCESS PRODUCTION
+   - ID: 5175
+   - Tên: hoithoxanh-production
+   - API Token: AKXOSYVCCFNZSWHU8PRJQWPVPGGDZ0IDB72HBAHBFZ8MGK9DTN1AMDLONNFVOR4X
+   - Trạng thái: Hoạt động ✅
+
+3. ENVIRONMENT VARIABLES (VERCEL)
+   - SEPAY_API_KEY: AKXOSYVCCFNZSWHU8PRJQWPVPGGDZ0IDB72HBAHBFZ8MGK9DTN1AMDLONNFVOR4X
+   - Scope: Production
+
+===========================================
+📖 HƯỚNG DẪN CẤU HÌNH CHO TÀI KHOẢN MỚI
+===========================================
+
+BƯỚC 1: ĐĂNG NHẬP VÀ LẤY THÔNG TIN
+-------------------------------------------
+1. Đăng nhập: https://my.sepay.vn/login
+2. Xác nhận thông tin:
+   - Tên công ty/cá nhân
+   - Tài khoản ngân hàng đang dùng
+   - Gói dịch vụ hiện tại
+
+BƯỚC 2: TẠO WEBHOOK
+-------------------------------------------
+1. Vào: https://my.sepay.vn/webhooks
+2. Click "Thêm webhooks"
+3. Điền thông tin:
+
+   ├─ Đặt tên: [TÊN_DỰ_ÁN]-production
+   │  VD: hoithoxanh-production, shopbanhang-production
+   │
+   ├─ [1] Chọn sự kiện
+   │  └─ Bắn WebHooks khi: "Có tiền vào"
+   │
+   ├─ [2] Chọn điều kiện  
+   │  ├─ Khi tài khoản ngân hàng là: [Chọn TK của bạn]
+   │  └─ Bỏ qua nếu không có Code thanh toán?: "Không"
+   │
+   ├─ [3] Thuộc tính WebHooks
+   │  ├─ Gọi đến URL: https://[DOMAIN]/api/payment/sepay/webhook
+   │  │  VD: https://yourdomain.vercel.app/api/payment/sepay/webhook
+   │  │
+   │  ├─ Là WebHooks xác thực thanh toán?: "Không"
+   │  └─ Gọi lại Webhooks khi?:
+   │     ☑ HTTP Status Code không nằm trong 200-299
+   │
+   └─ [4] Cấu hình chứng thực
+      ├─ Kiểu chứng thực: "Không cần chứng thực"
+      ├─ Request Content type: "application/json"
+      └─ Trạng thái: "Kích hoạt"
+
+4. Click "Thêm" để lưu
+
+BƯỚC 3: TẠO API ACCESS
+-------------------------------------------
+1. Vào: https://my.sepay.vn/companyapi
+2. Click "Thêm API Access"
+3. Điền thông tin:
+   - Tên: [TÊN_DỰ_ÁN]-production
+   - Trạng thái: "Hoạt động"
+4. Click "Thêm"
+5. **QUAN TRỌNG:** Copy API Token ngay sau khi tạo
+   - Token dạng: AKXOS...VOR4X (64 ký tự)
+   - Lưu vào nơi an toàn
+
+BƯỚC 4: CẤU HÌNH VERCEL ENVIRONMENT VARIABLES
+-------------------------------------------
+Cách 1: Dùng CLI (Terminal)
+```bash
+cd /path/to/your/project
+echo "YOUR_SEPAY_API_TOKEN" | vercel env add SEPAY_API_KEY production
+```
+
+Cách 2: Dùng Vercel Dashboard
+1. Vào: https://vercel.com/[team]/[project]/settings/environment-variables
+2. Click "Add New"
+3. Điền:
+   - Name: SEPAY_API_KEY
+   - Value: [Paste API Token vừa copy]
+   - Environment: Production
+4. Click "Save"
+
+BƯỚC 5: DEPLOY
+-------------------------------------------
+Cách 1: Deploy qua Git (Khuyến nghị)
+```bash
+git add .
+git commit -m "feat: integrate Sepay payment"
+git push origin main
+```
+→ Vercel tự động deploy
+
+Cách 2: Deploy qua CLI
+```bash
+vercel --prod
+```
+
+BƯỚC 6: TEST THANH TOÁN
+-------------------------------------------
+1. Vào website production
+2. Thêm sản phẩm vào giỏ hàng
+3. Checkout → Chọn "Thanh toán online - Chuyển khoản"
+4. Điền thông tin → Đặt hàng
+5. Được redirect đến trang Sepay
+6. Chuyển khoản theo QR/thông tin
+7. Kiểm tra:
+   ✓ Đơn hàng tự động cập nhật trạng thái
+   ✓ Webhook log trong Sepay Dashboard
+   ✓ Admin panel hiển thị đơn hàng
+
+===========================================
+🔧 CẤU TRÚC CODE (ĐÃ CÓ SẴN)
+===========================================
+
+FILE BACKEND API ROUTES:
+├─ app/api/payment/sepay/webhook/route.ts
+│  └─ Nhận notification từ Sepay khi có giao dịch
+│  └─ Tự động cập nhật trạng thái đơn hàng
+│
+├─ app/api/payment/sepay/return/route.ts
+│  └─ Xử lý khi user quay về từ trang Sepay
+│
+├─ app/api/payment/sepay/create/route.ts
+│  └─ Tạo phiên thanh toán Sepay
+│
+└─ app/api/orders/create/route.ts
+   └─ Tạo đơn hàng trong database
+
+FILE FRONTEND:
+├─ app/checkout/page.tsx
+│  └─ Trang checkout với payment selection
+│
+├─ components/PaymentProcessing.tsx
+│  └─ Modal hiển thị khi đang xử lý thanh toán
+│
+└─ components/PaymentForm.tsx
+   └─ Form chọn phương thức thanh toán
+
+FILE CẤU HÌNH:
+├─ .env.local (Local development)
+│  SEPAY_API_KEY=sk_test_xxx...
+│  SEPAY_RETURN_URL=http://localhost:3000/api/payment/sepay/return
+│  SEPAY_WEBHOOK_URL=http://localhost:3000/api/payment/sepay/webhook
+│
+└─ Vercel Environment Variables (Production)
+   SEPAY_API_KEY=AKXOSYVCCFNZSWHU8PRJQWPVPGGDZ0IDB72HBAHBFZ8MGK9DTN1AMDLONNFVOR4X
+   (Các URL tự động dùng production domain)
+
+===========================================
+⚠️ LƯU Ý QUAN TRỌNG
+===========================================
+
+1. BẢO MẬT API KEY
+   ✗ KHÔNG commit .env.local lên Git
+   ✗ KHÔNG share API Key công khai
+   ✓ Chỉ lưu trong Vercel Environment Variables
+   ✓ Backup API Key ở nơi an toàn
+
+2. WEBHOOK URL
+   ✓ Phải là HTTPS (production)
+   ✓ Phải accessible từ internet
+   ✗ Localhost không dùng được (production)
+   → Dùng ngrok nếu test local: ngrok http 3000
+
+3. RETURN URL
+   ✓ Là URL để user quay về sau khi thanh toán
+   ✓ Không bắt buộc phải trả về 200 OK
+   → Webhook mới là nơi cập nhật đơn hàng
+
+4. WEBHOOK RESPONSE
+   ✓ Phải return HTTP 200-299 để Sepay biết thành công
+   ✗ Nếu fail, Sepay sẽ retry theo config
+   → Code đã handle sẵn
+
+5. TESTING
+   - Test local: Dùng ngrok expose localhost
+   - Test staging: Deploy staging environment riêng
+   - Test production: Dùng số tiền nhỏ để test thật
+
+6. MÃ THANH TOÁN
+   - Format: HTX-[TIMESTAMP]
+   - VD: HTX-1736024400123
+   - Được tự động sinh trong code
+   - Cấu hình mẫu mã tại: https://my.sepay.vn/company/configuration
+
+===========================================
+🆘 TROUBLESHOOTING
+===========================================
+
+VẤN ĐỀ 1: Webhook không nhận được data
+├─ Kiểm tra URL webhook đúng chưa
+├─ Xem logs trong Sepay Dashboard → Webhooks → View logs
+├─ Test webhook endpoint: curl https://[domain]/api/payment/sepay/webhook
+└─ Verify Sepay có gọi được không (check Vercel logs)
+
+VẤN ĐỀ 2: Đơn hàng không tự động cập nhật
+├─ Check webhook có được gọi không (Sepay logs)
+├─ Check response webhook có 200 OK không
+├─ Verify database connection (Supabase)
+└─ Check RLS policies cho orders table
+
+VẤN ĐỀ 3: Không redirect được về trang Sepay
+├─ Kiểm tra SEPAY_API_KEY đúng chưa
+├─ Verify SEPAY_ENDPOINT
+├─ Check browser console errors
+└─ Review Vercel function logs
+
+VẤN ĐỀ 4: Deploy failed
+├─ Check git author có quyền deploy không
+├─ Verify Vercel project settings
+├─ Push qua Git thay vì CLI
+└─ Hoặc deploy trực tiếp trên Vercel Dashboard
+
+===========================================
+📚 TÀI LIỆU THAM KHẢO
+===========================================
+
+Sepay:
+- Developer Docs: https://developer.sepay.vn/vi
+- Dashboard: https://my.sepay.vn/
+- Support: support@sepay.vn
+- Hotline: 02873.059.589
+
+Vercel:
+- Dashboard: https://vercel.com/
+- Docs: https://vercel.com/docs
+- Environment Variables: https://vercel.com/docs/environment-variables
+
+===========================================
+💡 TIPS CHO CURSOR/AI ASSISTANT KHÁC
+===========================================
+
+Khi được yêu cầu setup Sepay cho dự án mới:
+
+1. ĐỌC FILE NÀY trước
+2. Hỏi user thông tin:
+   - Domain production là gì?
+   - Đã có tài khoản Sepay chưa?
+   - Tài khoản ngân hàng nào?
+3. Sử dụng browser tools để:
+   - Navigate đến https://my.sepay.vn/
+   - Tạo webhook tự động
+   - Tạo API key tự động
+   - Copy thông tin về
+4. Cấu hình Vercel env vars
+5. Deploy và test
+
+KHÔNG TẠO CÁC FILE .md HAY HƯỚNG DẪN DÀI DÒNG
+→ Chỉ cần action trực tiếp và note lại trong file .txt này
+
+===========================================
+📝 CHANGELOG
+===========================================
+
+2025-01-04:
+- Initial setup cho hoithoxanh production
+- Webhook ID: 17017
+- API Key ID: 5175
+- Deploy domain: air-purifier-hcm.vercel.app
+
+[Ghi chú các lần cập nhật sau ở đây]
+
+===========================================
+            HẾT TÀI LIỆU
+===========================================
+

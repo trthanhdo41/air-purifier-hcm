@@ -1,53 +1,76 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Send, ThumbsUp, User as UserIcon, MessageCircle } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 import LoginModal from "@/components/LoginModal";
+import { createClient } from "@/lib/supabase/client";
 
 export default function UserQA() {
   const [question, setQuestion] = useState("");
   const [loginOpen, setLoginOpen] = useState(false);
   const { user } = useAuthStore();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const qaData = [
-    {
-      id: 1,
-      user: "Nguyễn Minh",
-      time: "2 tuần trước",
-      question: "Máy lọc không khí Xiaomi Mi Air Purifier 4 có tốt không?",
-      answer: {
-        user: "Quản trị viên",
-        badge: "QTV",
-        time: "2 tuần trước",
-        text: "Máy Lọc Không Khí HCM xin chào anh Minh\nDạ MÁY LỌC KHÔNG KHÍ XIAOMI MI AIR PURIFIER 4 là sản phẩm rất tốt với công nghệ HEPA 13, lọc được 99.97% bụi mịn PM2.5. Giá khuyến mãi hiện tại 4.990.000đ\nMáy phù hợp cho phòng 20-40m², có ứng dụng điều khiển thông minh\nAnh có thể đến showroom để trải nghiệm trực tiếp ạ!"
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("questions")
+          .select("id, name, content, created_at, answer_text, answered_at")
+          .order("created_at", { ascending: false })
+          .limit(20);
+        setItems(
+          (data || []).map((q) => ({
+            id: q.id,
+            user: q.name || "Khách",
+            time: new Date(q.created_at).toLocaleDateString("vi-VN"),
+            question: q.content,
+            answer: q.answered_at ? {
+              user: "Quản trị viên",
+              badge: "QTV",
+              time: new Date(q.answered_at).toLocaleDateString("vi-VN"),
+              text: q.answer_text || "",
+            } : undefined,
+          }))
+        );
+      } finally {
+        setLoading(false);
       }
-    },
-    {
-      id: 2,
-      user: "Trần Thị Lan",
-      time: "1 tháng trước",
-      question: "Máy lọc không khí Sharp FP-F40E-W có phù hợp phòng ngủ không?",
-      answer: {
-        user: "Quản trị viên",
-        badge: "QTV",
-        time: "1 tháng trước",
-        text: "Máy Lọc Không Khí HCM xin chào chị Lan\nDạ MÁY LỌC KHÔNG KHÍ SHARP FP-F40E-W rất phù hợp cho phòng ngủ với công nghệ Plasmacluster Ion\nMáy có chế độ Sleep Mode hoạt động rất êm (chỉ 20dB), không ảnh hưởng giấc ngủ\nDiện tích phù hợp: 25-30m²\nChị có thể đặt hàng online hoặc đến showroom để được tư vấn chi tiết ạ!"
-      }
-    },
-    {
-      id: 3,
-      user: "Lê Văn Hùng",
-      time: "3 tuần trước",
-      question: "Bao lâu thì thay bộ lọc máy lọc không khí?",
-      answer: {
-        user: "Quản trị viên",
-        badge: "QTV",
-        time: "3 tuần trước",
-        text: "Máy Lọc Không Khí HCM xin chào anh Hùng\nDạ tần suất thay bộ lọc phụ thuộc vào mức độ sử dụng:\n- Bộ lọc HEPA: 6-12 tháng\n- Bộ lọc Carbon: 3-6 tháng\n- Bộ lọc UV: 12-18 tháng\nChúng tôi có dịch vụ thay bộ lọc tại nhà và bảo hành chính hãng\nAnh có thể đăng ký nhắc nhở thay bộ lọc định kỳ ạ!"
-      }
+    };
+    fetchData();
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!user) {
+      setLoginOpen(true);
+      return;
     }
-  ];
+    const content = question.trim();
+    if (!content) return;
+    const supabase = createClient();
+    const name = user.name || (user.email ? user.email.split("@")[0] : "");
+    const { data, error } = await supabase
+      .from("questions")
+      .insert({ user_id: user.id, name, content })
+      .select("id, name, content, created_at")
+      .single();
+    if (!error && data) {
+      setItems((prev) => [
+        {
+          id: data.id,
+          user: data.name || "Khách",
+          time: new Date(data.created_at).toLocaleDateString(),
+          question: data.content,
+        },
+        ...prev,
+      ]);
+      setQuestion("");
+    }
+  };
 
   return (
     <>
@@ -74,16 +97,19 @@ export default function UserQA() {
                     type="text"
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSubmit();
+                      }
+                    }}
                     placeholder="Viết câu hỏi của bạn tại đây"
                     className="flex-1 border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all"
                   />
                   <button
                     onClick={(e) => {
                       e.preventDefault();
-                      if (!user) {
-                        setLoginOpen(true);
-                        return;
-                      }
+                      handleSubmit();
                     }}
                     className="bg-sky-500 hover:bg-sky-600 text-white px-4 sm:px-8 py-2 sm:py-3 rounded-lg text-sm sm:text-base font-semibold flex items-center justify-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl whitespace-nowrap"
                   >
@@ -97,7 +123,7 @@ export default function UserQA() {
 
           {/* Q&A List - Mobile Optimized */}
           <div className="space-y-4 sm:space-y-6">
-            {qaData.map((qa) => (
+            {items.map((qa) => (
               <div key={qa.id} className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                 {/* Question */}
                 <div className="flex gap-3 sm:gap-4 mb-4 sm:mb-6">
@@ -121,33 +147,30 @@ export default function UserQA() {
                   </div>
                 </div>
 
-                {/* Answer - Mobile Optimized */}
-                <div className="ml-0 sm:ml-16 bg-gray-50 rounded-lg p-4 sm:p-5 border-l-4 border-sky-400">
-                  <div className="flex gap-2 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-sky-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <UserIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-2">
-                        <h5 className="font-bold text-sm sm:text-base text-gray-900">{qa.answer.user}</h5>
-                        <span className="bg-sky-500 text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded font-bold">
-                          {qa.answer.badge}
-                        </span>
-                        <span className="text-xs sm:text-sm text-gray-500 flex items-center gap-1">
-                          <MessageCircle className="w-3 h-3" />
-                          {qa.answer.time}
-                        </span>
+                {qa.answer && (
+                  <div className="ml-0 sm:ml-16 bg-gray-50 rounded-lg p-4 sm:p-5 border-l-4 border-sky-400">
+                    <div className="flex gap-2 sm:gap-3">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-sky-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <UserIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-700 whitespace-pre-line leading-relaxed break-words">
-                        {qa.answer.text}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-2">
+                          <h5 className="font-bold text-sm sm:text-base text-gray-900">{qa.answer.user}</h5>
+                          <span className="bg-sky-500 text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded font-bold">
+                            {qa.answer.badge}
+                          </span>
+                          <span className="text-xs sm:text-sm text-gray-500 flex items-center gap-1">
+                            <MessageCircle className="w-3 h-3" />
+                            {qa.answer.time}
+                          </span>
+                        </div>
+                        <div className="text-xs sm:text-sm text-gray-700 whitespace-pre-line leading-relaxed break-words">
+                          {qa.answer.text}
+                        </div>
                       </div>
-                      <button className="mt-2 sm:mt-3 text-xs sm:text-sm text-sky-500 hover:text-sky-600 font-medium flex items-center gap-1 transition-all">
-                        <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                        Phản hồi
-                      </button>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>

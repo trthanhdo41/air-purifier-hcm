@@ -1,9 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import React from "react";
-import { categories } from "@/data/categories";
 import { ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
 
 interface CategorySectionProps {
   title: string;
@@ -12,7 +13,62 @@ interface CategorySectionProps {
 }
 
 export default function CategorySection({ title, categoryIds, onCategoryClick }: CategorySectionProps) {
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('categories')
+          .select('*')
+          .order('name');
+        
+        if (!error && data && data.length > 0) {
+          // Map icon names to components
+          const LucideIcons = require('lucide-react');
+          const iconMap: { [key: string]: any } = {
+            'Wind': LucideIcons.Wind,
+            'Zap': LucideIcons.Zap,
+            'Shield': LucideIcons.Shield,
+            'Sun': LucideIcons.Sun,
+            'Droplets': LucideIcons.Droplets,
+            'Home': LucideIcons.Home,
+            'Activity': LucideIcons.Activity,
+            'Leaf': LucideIcons.Leaf,
+            'Sparkles': LucideIcons.Sparkles,
+            'Filter': LucideIcons.Filter,
+            'AirVent': LucideIcons.Filter,
+          };
+          const mappedCategories = data.map(cat => ({
+            ...cat,
+            icon: iconMap[cat.icon] || LucideIcons.Wind
+          }));
+          setCategories(mappedCategories);
+        } else {
+          setCategories([]);
+        }
+      } catch (e) {
+        console.error('Error loading categories:', e);
+        setCategories([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
   const sectionCategories = categories.filter(cat => categoryIds.includes(cat.id));
+
+  if (loading) {
+    return <div className="mb-16">Loading...</div>;
+  }
+
+  if (sectionCategories.length === 0) {
+    return null;
+  }
 
   return (
     <div className="mb-16">
@@ -41,7 +97,7 @@ export default function CategorySection({ title, categoryIds, onCategoryClick }:
             <div className="absolute inset-0 bg-gradient-to-br from-red-50 to-orange-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             
             <div className="relative z-10 text-5xl group-hover:scale-110 transition-transform duration-300">
-              {React.createElement(category.icon, { className: "w-12 h-12" })}
+              {category.icon && React.createElement(category.icon, { className: "w-12 h-12" })}
             </div>
             <span className="relative z-10 text-sm text-center font-semibold text-gray-700 group-hover:text-red-600 transition-colors leading-tight">
               {category.name}

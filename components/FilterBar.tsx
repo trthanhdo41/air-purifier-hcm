@@ -1,9 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { SortOption } from "@/types";
-import { brands } from "@/data/categories";
 import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 
 interface FilterBarProps {
   selectedBrand: string;
@@ -20,6 +21,35 @@ export default function FilterBar({
   onSortChange,
   totalProducts,
 }: FilterBarProps) {
+  const [brands, setBrands] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadBrands = async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('products')
+          .select('brand')
+          .eq('status', 'active');
+        
+        if (!error && data && data.length > 0) {
+          const uniqueBrands = Array.from(new Set(data.map(p => p.brand).filter(Boolean))) as string[];
+          setBrands(uniqueBrands.sort());
+        } else {
+          setBrands([]);
+        }
+      } catch (e) {
+        console.error('Error loading brands:', e);
+        setBrands([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadBrands();
+  }, []);
+
   const sortOptions: { value: SortOption; label: string }[] = [
     { value: "popular", label: "Phổ biến nhất" },
     { value: "hot-deals", label: "Khuyến mãi HOT" },

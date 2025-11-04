@@ -10,6 +10,9 @@ export interface CartItem {
 interface CartStore {
   items: CartItem[];
   isOpen: boolean;
+  buyNowItems: CartItem[]; // Items cho "Mua ngay"
+  setBuyNowItems: (items: CartItem[]) => void;
+  clearBuyNowItems: () => void;
   addItem: (product: Product) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
@@ -27,6 +30,15 @@ export const useCartStore = create<CartStore>()(
     (set, get) => ({
       items: [],
       isOpen: false,
+      buyNowItems: [],
+
+      setBuyNowItems: (items: CartItem[]) => {
+        set({ buyNowItems: items });
+      },
+
+      clearBuyNowItems: () => {
+        set({ buyNowItems: [] });
+      },
 
       addItem: (product: Product) => {
         const items = get().items;

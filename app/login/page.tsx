@@ -23,12 +23,18 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const result = isLogin 
+    if (isLogin && email.trim().toLowerCase() === 'admin@hoithoxanh.com') {
+      setLoading(false);
+      setError('Email không hợp lệ');
+      return;
+    }
+
+    const result = isLogin
       ? await signIn(email, password)
       : await signUp(email, password, fullName);
 
     if (result.success) {
-      router.push("/");
+      router.push('/');
     } else {
       setError(result.error || "Đăng nhập thất bại");
     }

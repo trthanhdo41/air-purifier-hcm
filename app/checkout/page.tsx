@@ -15,13 +15,17 @@ import Footer from "@/components/Footer";
 import Botchat from "@/components/Botchat";
 import LoginModal from "@/components/LoginModal";
 import AddressSelector from "@/components/AddressSelector";
+import { useProvinces } from "@/lib/hooks/useProvinces";
+import PaymentProcessing from "@/components/PaymentProcessing";
 
 export default function CheckoutPage() {
-  const { items, getTotalItems, getTotalPrice, getTotalSavings } = useCartStore();
+  const { items, buyNowItems, getTotalItems, getTotalPrice, getTotalSavings, clearBuyNowItems } = useCartStore();
   const { user } = useAuthStore();
   const router = useRouter();
+  const { provinces, districts, wards, fetchDistricts, fetchWards } = useProvinces();
   const [currentStep, setCurrentStep] = useState(1);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -34,17 +38,53 @@ export default function CheckoutPage() {
     paymentMethod: "cod",
   });
 
-  const totalItems = getTotalItems();
-  const totalPrice = getTotalPrice();
-  const totalSavings = getTotalSavings();
+  // Helper function để map code thành tên
+  const getCityName = (code: string) => {
+    const province = provinces.find(p => p.code === code);
+    return province ? province.name : code;
+  };
+
+  const getDistrictName = (code: string) => {
+    const districtObj = districts.find(d => d.code === code);
+    return districtObj ? districtObj.name : code;
+  };
+
+  const getWardName = (code: string) => {
+    const wardObj = wards.find(w => w.code === code);
+    return wardObj ? wardObj.name : code;
+  };
+
+  // Sử dụng buyNowItems nếu có, không thì dùng items
+  const checkoutItems = buyNowItems.length > 0 ? buyNowItems : items;
+  
+  // Tính toán dựa trên checkoutItems
+  const totalItems = checkoutItems.reduce((total, item) => total + item.quantity, 0);
+  const totalPrice = checkoutItems.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+  const totalSavings = checkoutItems.reduce((total, item) => {
+    if (item.product.originalPrice) {
+      return total + ((item.product.originalPrice - item.product.price) * item.quantity);
+    }
+    return total;
+  }, 0);
+
+  // Scroll to top when page loads - scroll immediately first, then smooth
+  useEffect(() => {
+    window.scrollTo(0, 0); // Immediate scroll
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
+  }, []);
 
   useEffect(() => {
-    if (!user) {
-      try {
-        localStorage.setItem('triggerLogin', '1');
-        localStorage.setItem('loginMessage', 'checkout');
-      } catch {}
+    // Nếu giỏ hàng trống, redirect về home
+    if (checkoutItems.length === 0 && user) {
       router.push('/');
+      return;
+    }
+    
+    if (!user && checkoutItems.length > 0) {
+      // Nếu chưa đăng nhập nhưng có sản phẩm trong giỏ, mở modal đăng nhập
+      setLoginModalOpen(true);
     } else if (user && (!formData.fullName || !formData.phone || !formData.city)) {
       setFormData(prev => ({
         ...prev,
@@ -58,6 +98,33 @@ export default function CheckoutPage() {
       }));
     }
   }, [user, router]);
+
+  // Load districts và wards khi có city/district trong formData để hiển thị tên
+  useEffect(() => {
+    if (formData.city) {
+      // Kiểm tra xem districts hiện tại có thuộc city này không
+      const needLoad = districts.length === 0 || !districts.some(d => {
+        // Nếu có district trong formData, kiểm tra xem nó có trong danh sách không
+        return formData.district ? d.code === formData.district : true;
+      });
+      if (needLoad) {
+        fetchDistricts(formData.city);
+      }
+    }
+  }, [formData.city, formData.district, districts, fetchDistricts]);
+
+  useEffect(() => {
+    if (formData.district) {
+      // Kiểm tra xem wards hiện tại có thuộc district này không
+      const needLoad = wards.length === 0 || !wards.some(w => {
+        // Nếu có ward trong formData, kiểm tra xem nó có trong danh sách không
+        return formData.ward ? w.code === formData.ward : true;
+      });
+      if (needLoad) {
+        fetchWards(formData.district);
+      }
+    }
+  }, [formData.district, formData.ward, wards, fetchWards]);
 
   // Validation states
   const isStep1Valid = formData.fullName.trim() && formData.phone.trim() && formData.city && formData.district && formData.ward && formData.address.trim();
@@ -96,19 +163,104 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!user) {
       setLoginModalOpen(true);
       return;
     }
-    
-    console.log("Order submitted:", { formData, items, totalPrice });
-    router.push("/success");
+
+    // Validate required fields
+    if (!formData.fullName.trim() || !formData.phone.trim() || !formData.city || !formData.district || !formData.ward || !formData.address.trim()) {
+      alert("Vui lòng điền đầy đủ thông tin giao hàng bắt buộc (*)");
+      return;
+    }
+
+    try {
+      // Save order to database first
+      const shippingFee = 0; // You can calculate this based on location
+      const discountAmount = 0; // You can calculate this based on coupons
+      const finalAmount = totalPrice + shippingFee - discountAmount;
+
+      const createOrderRes = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: checkoutItems,
+          totalAmount: totalPrice,
+          shippingFee,
+          discountAmount,
+          finalAmount,
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          district: formData.district,
+          ward: formData.ward,
+          note: formData.note,
+          paymentMethod: formData.paymentMethod,
+        }),
+      });
+
+      const orderData = await createOrderRes.json();
+
+      if (!createOrderRes.ok || !orderData.success) {
+        alert(orderData.error || 'Có lỗi xảy ra khi tạo đơn hàng. Vui lòng thử lại.');
+        return;
+      }
+
+      // Clear buy now items if used
+      if (buyNowItems.length > 0) {
+        clearBuyNowItems();
+      }
+
+            // Handle payment method
+            if (formData.paymentMethod === 'sepay') {
+              setIsProcessingPayment(true);
+              try {
+                const orderCode = orderData.order.order_number;
+                const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+                const res = await fetch(`${apiBase}/api/payment/sepay/create`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    amount: finalAmount, 
+                    orderCode, 
+                    description: `Thanh toan don hang ${orderCode}`,
+                    orderId: orderData.order.id,
+                  }),
+                });
+                const data = await res.json();
+                
+                if (data?.url) {
+                  // Delay một chút để show loading animation
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  window.location.href = data.url as string;
+                  return;
+                }
+                
+                setIsProcessingPayment(false);
+                alert('Không thể tạo thanh toán. Vui lòng thử lại hoặc chọn phương thức khác.');
+                return;
+              } catch (err) {
+                console.error('Sepay error:', err);
+                setIsProcessingPayment(false);
+                alert('Có lỗi xảy ra khi tạo thanh toán. Vui lòng thử lại.');
+                return;
+              }
+            }
+
+            // For COD, redirect to success page
+            router.push(`/success?order=${orderData.order.order_number}`);
+    } catch (error: any) {
+      console.error('Error submitting order:', error);
+      alert('Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.');
+    }
   };
 
-  if (items.length === 0) {
+  if (checkoutItems.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-50 to-blue-50 flex items-center justify-center p-4">
         <motion.div
@@ -139,6 +291,20 @@ export default function CheckoutPage() {
       
       <main className="flex-1">
         <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
+          {/* Back to Cart Button */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 sm:mb-6"
+          >
+            <Link href="/cart">
+              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Quay lại giỏ hàng
+              </Button>
+            </Link>
+          </motion.div>
+
           {/* Login Warning Banner */}
           {!user && (
             <motion.div
@@ -403,7 +569,7 @@ export default function CheckoutPage() {
                       <div className="space-y-2 text-sm">
                         <p><span className="font-medium">Người nhận:</span> {formData.fullName}</p>
                         <p><span className="font-medium">SĐT:</span> {formData.phone}</p>
-                        <p><span className="font-medium">Địa chỉ:</span> {formData.address}, {formData.ward}, {formData.district}, {formData.city}</p>
+                        <p><span className="font-medium">Địa chỉ:</span> {formData.address}, {getWardName(formData.ward)}, {getDistrictName(formData.district)}, {getCityName(formData.city)}</p>
                         {formData.note && <p><span className="font-medium">Ghi chú:</span> {formData.note}</p>}
                       </div>
                     </div>
@@ -415,7 +581,9 @@ export default function CheckoutPage() {
                           <CreditCard className="w-4 h-4 text-sky-600" />
                         </div>
                         <span className="font-medium">
-                          {formData.paymentMethod === "cod" ? "Thanh toán khi nhận hàng" : "Thanh toán online"}
+                          {formData.paymentMethod === "cod" 
+                            ? "Thanh toán khi nhận hàng" 
+                            : "Thanh toán online - Chuyển khoản"}
                         </span>
                       </div>
                     </div>
@@ -454,10 +622,20 @@ export default function CheckoutPage() {
                   ) : (
                     <Button
                       onClick={handleSubmit}
-                      className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 px-6 sm:px-8 py-2.5 sm:py-3 w-full sm:w-auto"
+                      disabled={isProcessingPayment}
+                      className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 px-6 sm:px-8 py-2.5 sm:py-3 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Đặt hàng
+                      {isProcessingPayment ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          Đang xử lý...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Đặt hàng
+                        </>
+                      )}
                     </Button>
                   )}
                 </motion.div>
@@ -473,7 +651,7 @@ export default function CheckoutPage() {
               transition={{ delay: 0.2 }}
               className="sticky top-4 sm:top-6 lg:top-8"
             >
-              <OrderSummary />
+              <OrderSummary items={checkoutItems} />
             </motion.div>
           </div>
         </div>
@@ -485,6 +663,9 @@ export default function CheckoutPage() {
       
       {/* Login Modal */}
       <LoginModal isOpen={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
+      
+      {/* Payment Processing Modal */}
+      {isProcessingPayment && <PaymentProcessing />}
     </div>
   );
 }

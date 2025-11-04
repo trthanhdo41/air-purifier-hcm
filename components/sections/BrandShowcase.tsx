@@ -1,11 +1,61 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { brands } from "@/data/categories";
 import FadeInWhenVisible from "@/components/animations/FadeInWhenVisible";
+import { createClient } from "@/lib/supabase/client";
 
 export default function BrandShowcase() {
-  const featuredBrands = brands.slice(0, 12);
+  const [brands, setBrands] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadBrands = async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('products')
+          .select('brand')
+          .eq('status', 'active');
+        
+        if (!error && data && data.length > 0) {
+          const uniqueBrands = Array.from(new Set(data.map(p => p.brand).filter(Boolean))) as string[];
+          setBrands(uniqueBrands.sort().slice(0, 12));
+        } else {
+          setBrands([]);
+        }
+      } catch (e) {
+        console.error('Error loading brands:', e);
+        setBrands([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadBrands();
+  }, []);
+
+  const featuredBrands = brands;
+
+  if (loading) {
+    return (
+      <section className="py-16">
+        <div className="text-center mb-12">
+          <div className="h-10 bg-gray-200 rounded w-64 mx-auto mb-4 animate-pulse" />
+          <div className="h-6 bg-gray-200 rounded w-96 mx-auto animate-pulse" />
+        </div>
+        <div className="flex gap-8">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="flex-shrink-0 w-40 h-24 bg-gray-100 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (brands.length === 0) {
+    return null;
+  }
 
   return (
     <section className="py-16">

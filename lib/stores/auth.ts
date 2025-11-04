@@ -9,7 +9,7 @@ interface AuthState {
   setUser: (user: User | null) => void;
   setLoading: (loading: boolean) => void;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password: string, fullName?: string, phone?: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   updateProfile: (name?: string, phone?: string, address?: string, city?: string, district?: string, ward?: string) => Promise<{ success: boolean; error?: string }>;
 }
@@ -41,7 +41,18 @@ export const useAuthStore = create<AuthState>()(
           if (error) {
             set({ loading: false });
             console.error("Supabase error:", error);
-            return { success: false, error: error.message };
+            // Translate common error messages to Vietnamese
+            let errorMessage = error.message;
+            if (error.message === 'Invalid login credentials') {
+              errorMessage = 'Email hoặc mật khẩu không đúng';
+            } else if (error.message.includes('Email not confirmed')) {
+              errorMessage = 'Email chưa được xác thực';
+            } else if (error.message.includes('User already registered')) {
+              errorMessage = 'Email này đã được đăng ký';
+            } else if (error.message.includes('Password')) {
+              errorMessage = 'Mật khẩu không hợp lệ';
+            }
+            return { success: false, error: errorMessage };
           }
 
           if (data.user) {
@@ -71,7 +82,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      signUp: async (email, password, fullName) => {
+      signUp: async (email, password, fullName, phone) => {
         set({ loading: true });
         try {
           const supabase = createClient();
@@ -79,15 +90,26 @@ export const useAuthStore = create<AuthState>()(
             email,
             password,
             options: {
+              emailRedirectTo: undefined, // Disable email confirmation
               data: {
                 full_name: fullName || '',
+                phone: phone || '',
               },
             },
           });
 
           if (error) {
             set({ loading: false });
-            return { success: false, error: error.message };
+            // Translate common error messages to Vietnamese
+            let errorMessage = error.message;
+            if (error.message === 'User already registered') {
+              errorMessage = 'Email này đã được đăng ký';
+            } else if (error.message.includes('Password')) {
+              errorMessage = 'Mật khẩu không hợp lệ';
+            } else if (error.message.includes('Email')) {
+              errorMessage = 'Email không hợp lệ';
+            }
+            return { success: false, error: errorMessage };
           }
 
           if (data.user) {

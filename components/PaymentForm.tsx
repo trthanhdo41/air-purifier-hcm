@@ -19,40 +19,12 @@ export default function PaymentForm({ paymentMethod, onPaymentMethodChange }: Pa
       popular: true
     },
     {
-      id: "momo",
-      name: "Ví MoMo",
-      description: "Thanh toán qua ứng dụng MoMo",
-      icon: Smartphone,
-      color: "bg-pink-500",
+      id: "sepay",
+      name: "Thanh toán online - Chuyển khoản",
+      description: "Thanh toán qua QR Code hoặc chuyển khoản ngân hàng",
+      icon: CreditCard,
+      color: "bg-emerald-600",
       popular: true
-    },
-    {
-      id: "zalopay",
-      name: "ZaloPay",
-      description: "Thanh toán qua ZaloPay",
-      icon: Smartphone,
-      color: "bg-blue-500"
-    },
-    {
-      id: "vnpay",
-      name: "VNPay",
-      description: "Thanh toán qua VNPay",
-      icon: CreditCard,
-      color: "bg-red-500"
-    },
-    {
-      id: "visa",
-      name: "Thẻ Visa/Mastercard",
-      description: "Thanh toán bằng thẻ quốc tế",
-      icon: CreditCard,
-      color: "bg-blue-600"
-    },
-    {
-      id: "kredivo",
-      name: "Kredivo",
-      description: "Trả góp 0% lãi suất",
-      icon: Building2,
-      color: "bg-purple-500"
     }
   ];
 
@@ -63,10 +35,12 @@ export default function PaymentForm({ paymentMethod, onPaymentMethodChange }: Pa
           key={method.id}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1 }}
-          className={`relative border-2 rounded-xl p-4 cursor-pointer transition-all ${
+          transition={{ delay: index * 0.1, duration: 0.3, ease: "easeOut" }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          className={`relative border-2 rounded-xl p-4 cursor-pointer transition-all duration-300 ${
             paymentMethod === method.id
-              ? "border-sky-500 bg-sky-50"
+              ? "border-sky-500 bg-sky-50 shadow-md"
               : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
           }`}
           onClick={() => onPaymentMethodChange(method.id)}
@@ -97,7 +71,7 @@ export default function PaymentForm({ paymentMethod, onPaymentMethodChange }: Pa
                     <span>An toàn</span>
                   </div>
                 )}
-                {method.id === "visa" && (
+                {method.id === "bank_transfer" && (
                   <div className="flex items-center gap-1 text-xs text-blue-600">
                     <Lock className="w-3 h-3" />
                     <span>Bảo mật</span>
@@ -123,29 +97,40 @@ export default function PaymentForm({ paymentMethod, onPaymentMethodChange }: Pa
             </div>
           </div>
 
-          {/* Security Features */}
-          {method.id === "visa" && (
+          {/* Online Payment Info */}
+          {method.id === "sepay" && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ 
                 opacity: paymentMethod === method.id ? 1 : 0, 
                 height: paymentMethod === method.id ? "auto" : 0 
               }}
-              className="mt-3 pt-3 border-t border-gray-200"
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="mt-3 pt-3 border-t border-gray-200 overflow-hidden"
             >
-              <div className="flex items-center gap-4 text-xs text-gray-600">
-                <div className="flex items-center gap-1">
-                  <Lock className="w-3 h-3" />
-                  <span>SSL 256-bit</span>
+              <div className="space-y-2 text-xs text-gray-600">
+                <p className="font-semibold text-gray-900">Thanh toán online:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-1 text-emerald-600">
+                    <Shield className="w-3 h-3" />
+                    <span>Thanh toán nhanh chóng</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-emerald-600">
+                    <Lock className="w-3 h-3" />
+                    <span>Bảo mật SSL</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-emerald-600">
+                    <CreditCard className="w-3 h-3" />
+                    <span>QR Code</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-emerald-600">
+                    <Wallet className="w-3 h-3" />
+                    <span>Tự động xác nhận</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Shield className="w-3 h-3" />
-                  <span>PCI DSS</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <CreditCard className="w-3 h-3" />
-                  <span>3D Secure</span>
-                </div>
+                <p className="text-emerald-700 mt-2">
+                  Sau khi đặt hàng, bạn sẽ được chuyển đến trang thanh toán an toàn.
+                </p>
               </div>
             </motion.div>
           )}
@@ -158,7 +143,8 @@ export default function PaymentForm({ paymentMethod, onPaymentMethodChange }: Pa
                 opacity: paymentMethod === method.id ? 1 : 0, 
                 height: paymentMethod === method.id ? "auto" : 0 
               }}
-              className="mt-3 pt-3 border-t border-gray-200"
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="mt-3 pt-3 border-t border-gray-200 overflow-hidden"
             >
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center gap-1 text-green-600">

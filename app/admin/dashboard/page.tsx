@@ -24,6 +24,8 @@ export default function AdminDashboardPage() {
   });
 
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [unanswered, setUnanswered] = useState<any[]>([]);
+  const [answered, setAnswered] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,15 +36,23 @@ export default function AdminDashboardPage() {
     try {
       const supabase = createClient();
 
-      const [productsResult, ordersResult, usersResult] = await Promise.all([
+      // Fetch users using API route (requires Service Role Key)
+      const usersResponse = await fetch('/api/admin/users');
+      let users: any[] = [];
+      if (usersResponse.ok) {
+        const usersData = await usersResponse.json();
+        users = usersData.users || [];
+      }
+
+      const [productsResult, ordersResult, unansweredQs, answeredQs] = await Promise.all([
         supabase.from('products').select('id').eq('status', 'active'),
         supabase.from('orders').select('*'),
-        supabase.auth.admin.listUsers(),
+        supabase.from('questions').select('id,name,content,created_at').is('answered_at', null).order('created_at', { ascending: false }).limit(5),
+        supabase.from('questions').select('id,name,content,answered_at').not('answered_at', 'is', null).order('answered_at', { ascending: false }).limit(5),
       ]);
 
       const products = productsResult.data || [];
       const orders = ordersResult.data || [];
-      const users = usersResult.data?.users || [];
 
       const totalRevenue = orders
         .filter((o: any) => o.status === 'delivered')
@@ -61,6 +71,18 @@ export default function AdminDashboardPage() {
       });
 
       setRecentOrders(orders.slice(0, 10));
+      setUnanswered((unansweredQs.data || []).map((q: any) => ({
+        id: q.id,
+        user: q.name || 'Khách',
+        content: q.content,
+        time: new Date(q.created_at).toLocaleDateString('vi-VN')
+      })));
+      setAnswered((answeredQs.data || []).map((q: any) => ({
+        id: q.id,
+        user: q.name || 'Khách',
+        content: q.content,
+        time: new Date(q.answered_at).toLocaleDateString('vi-VN')
+      })));
       setLoading(false);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -254,6 +276,64 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </motion.div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-900">Câu hỏi chưa trả lời</h2>
+            <a href="/admin/contacts" className="text-sm text-sky-600 hover:text-sky-700 font-medium">Xem tất cả →</a>
+          </div>
+          <div className="space-y-3">
+            {unanswered.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Clock className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <p>Không có câu hỏi chờ trả lời</p>
+              </div>
+            ) : (
+              unanswered.map((q) => (
+                <div key={q.id} className="p-3 bg-gray-50 rounded-lg">
+                  <p className="font-semibold text-gray-900">{q.user}</p>
+                  <p className="text-sm text-gray-700 line-clamp-2">{q.content}</p>
+                  <p className="text-xs text-gray-500 mt-1">{q.time}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-900">Câu hỏi đã trả lời</h2>
+            <a href="/admin/contacts" className="text-sm text-sky-600 hover:text-sky-700 font-medium">Xem tất cả →</a>
+          </div>
+          <div className="space-y-3">
+            {answered.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <CheckCircle className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <p>Chưa có câu trả lời</p>
+              </div>
+            ) : (
+              answered.map((q) => (
+                <div key={q.id} className="p-3 bg-gray-50 rounded-lg">
+                  <p className="font-semibold text-gray-900">{q.user}</p>
+                  <p className="text-sm text-gray-700 line-clamp-2">{q.content}</p>
+                  <p className="text-xs text-gray-500 mt-1">{q.time}</p>
+                </div>
+              ))
+            )}
           </div>
         </motion.div>
       </div>

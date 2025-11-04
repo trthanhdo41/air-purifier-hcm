@@ -14,7 +14,10 @@ import {
   LogOut,
   Menu,
   X,
-  Settings
+  Settings,
+  MessageCircle,
+  FolderTree,
+  Newspaper
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -24,11 +27,14 @@ interface AdminLayoutProps {
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Tổng quan", path: "/admin/dashboard" },
+  { icon: FolderTree, label: "Danh mục", path: "/admin/categories" },
   { icon: Package, label: "Sản phẩm", path: "/admin/products" },
   { icon: ShoppingBag, label: "Đơn hàng", path: "/admin/orders" },
   { icon: Users, label: "Người dùng", path: "/admin/users" },
   { icon: Gift, label: "Mã giảm giá", path: "/admin/coupons" },
-  { icon: FileText, label: "Liên hệ", path: "/admin/contacts" },
+  { icon: Newspaper, label: "Tin tức", path: "/admin/news" },
+  { icon: FileText, label: "Hỏi đáp", path: "/admin/contacts" },
+  { icon: MessageCircle, label: "CSKH", path: "/admin/customer-service" },
   { icon: Settings, label: "Cài đặt", path: "/admin/settings" },
 ];
 
@@ -41,25 +47,27 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   useEffect(() => {
     setMounted(true);
-    if (user && user.email !== 'admin@hoithoxanh.com') {
-      router.push('/admin/login');
+    // Redirect non-admin users away from admin pages
+    if (user && user.email !== 'admin@hoithoxanh.com' && pathname.startsWith('/admin')) {
+      router.push('/home');
     }
-  }, [user, router]);
+    // Redirect unauthenticated users away from admin pages
+    if (!user && pathname.startsWith('/admin')) {
+      router.push('/home');
+    }
+  }, [user, router, pathname]);
 
   const handleSignOut = async () => {
     await signOut();
-    router.push('/admin/login');
+    router.push('/home');
   };
-
-  if (pathname === '/admin/login') {
-    return <>{children}</>;
-  }
 
   if (!mounted) {
     return null;
   }
 
-  if (pathname !== '/admin/login' && !user) {
+  // Don't render admin pages if user is not admin
+  if (!user || user.email !== 'admin@hoithoxanh.com') {
     return null;
   }
 
@@ -68,7 +76,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       <div className="flex">
         <aside className={`bg-slate-900 text-white transition-all duration-300 ease-in-out ${
           sidebarOpen ? 'w-64' : 'w-20'
-        } fixed h-screen z-30`}>
+        } fixed inset-y-0 z-30`}>
           <div className="flex flex-col h-full">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-3">

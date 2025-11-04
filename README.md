@@ -1,6 +1,6 @@
-# 🏠 Website Đồ Gia Dụng
+# 🌿 Hơi Thở Xanh - Máy lọc không khí
 
-E-commerce website hiện đại cho đồ gia dụng, được xây dựng với công nghệ tiên tiến nhất.
+E-commerce website chuyên về máy lọc không khí chính hãng, được xây dựng với công nghệ tiên tiến nhất.
 
 ## 🚀 Tech Stack
 

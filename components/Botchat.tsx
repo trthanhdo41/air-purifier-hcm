@@ -1,12 +1,235 @@
 "use client";
 
-import { useState } from "react";
-import { MessageCircle, X, Send, Headphones, Bot, Package, Tag, Settings } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MessageCircle, X, Send, Headphones, Bot, Package, Settings, ArrowLeft, ShoppingBag, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuthStore } from "@/lib/stores/auth";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+
+type ViewType = 'welcome' | 'orders' | 'warranty' | 'chat';
 
 export default function Botchat() {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [currentView, setCurrentView] = useState<ViewType>('welcome');
+  const [orders, setOrders] = useState<any[]>([]);
+  const [warrantyProducts, setWarrantyProducts] = useState<any[]>([]);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuthStore();
+  const router = useRouter();
+
+  const fetchOrders = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      setOrders(data || []);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchWarrantyProducts = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('id, created_at')
+        .eq('user_id', user.id)
+        .eq('status', 'delivered');
+      
+      if (!ordersData || ordersData.length === 0) {
+        setWarrantyProducts([]);
+        return;
+      }
+
+      const orderIds = ordersData.map(o => o.id);
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('order_id, product_id')
+        .in('order_id', orderIds);
+      
+      if (!orderItems || orderItems.length === 0) {
+        setWarrantyProducts([]);
+        return;
+      }
+
+      const productIds = [...new Set(orderItems.map(item => item.product_id))];
+      const { data: products } = await supabase
+        .from('products')
+        .select('*')
+        .in('id', productIds);
+      
+      if (!products || products.length === 0) {
+        setWarrantyProducts([]);
+        return;
+      }
+
+      const warrantyItems: any[] = [];
+      const now = new Date();
+      const productMap = new Map(products.map(p => [p.id, p]));
+      
+      for (const item of orderItems) {
+        const order = ordersData.find(o => o.id === item.order_id);
+        const product = productMap.get(item.product_id);
+        if (order && product) {
+          const orderDate = new Date(order.created_at);
+          const warrantyExpiry = new Date(orderDate);
+          warrantyExpiry.setMonth(warrantyExpiry.getMonth() + 12);
+          
+          warrantyItems.push({
+            ...product,
+            orderDate: order.created_at,
+            warrantyExpiry: warrantyExpiry.toISOString(),
+            isExpired: now > warrantyExpiry,
+          });
+        }
+      }
+      
+      setWarrantyProducts(warrantyItems);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  const statusLabels: Record<string, string> = {
+    pending: 'Chờ xử lý',
+    processing: 'Đang xử lý',
+    shipped: 'Đang giao',
+    delivered: 'Đã giao',
+    cancelled: 'Đã hủy',
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      setCurrentView('welcome');
+    }
+  }, [isOpen]);
+
+  const fetchChatMessages = async () => {
+    if (!user) return;
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching messages:', error);
+        if (error.message?.includes('permission') || error.message?.includes('users')) {
+          setError('Lỗi quyền truy cập. Vui lòng đăng nhập lại.');
+        }
+        return;
+      }
+      
+      setChatMessages(data || []);
+      // Auto scroll to bottom
+      setTimeout(() => {
+        const container = document.getElementById('chat-messages-container');
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+        }
+      }, 100);
+    } catch (err: any) {
+      console.error('Error fetching messages:', err);
+      if (err?.message?.includes('permission') || err?.message?.includes('users')) {
+        setError('Lỗi quyền truy cập. Vui lòng đăng nhập lại.');
+      }
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!user || !message.trim() || sendingMessage) {
+      if (!user) {
+        setError('Vui lòng đăng nhập để gửi tin nhắn');
+        setTimeout(() => setError(null), 3000);
+      }
+      return;
+    }
+    
+    const msgText = message.trim();
+    setMessage('');
+    setSendingMessage(true);
+    setError(null);
+    
+    try {
+      const supabase = createClient();
+      console.log('Sending message:', { user_id: user.id, message: msgText });
+      
+      const { data, error: insertError } = await supabase
+        .from('chat_messages')
+        .insert({
+          user_id: user.id,
+          user_email: user.email || '',
+          user_name: user.name || null,
+          user_phone: user.phone || null,
+          message: msgText,
+          is_from_user: true,
+          is_read: false,
+        })
+        .select()
+        .single();
+      
+      console.log('Insert result:', { data, error: insertError });
+      
+      if (insertError) {
+        console.error('Error sending message:', insertError);
+        const errorMsg = insertError.message || insertError.code || 'Không thể gửi tin nhắn. Vui lòng thử lại.';
+        setError(errorMsg);
+        setMessage(msgText); // Restore message on error
+        setTimeout(() => setError(null), 5000);
+      } else {
+        console.log('Message sent successfully');
+        await fetchChatMessages();
+      }
+    } catch (err: any) {
+      console.error('Error sending message:', err);
+      setError(err?.message || 'Đã xảy ra lỗi. Vui lòng thử lại.');
+      setMessage(msgText); // Restore message on error
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentView === 'chat' && user) {
+      fetchChatMessages();
+      // Poll for new messages every 3 seconds
+      const interval = setInterval(fetchChatMessages, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [currentView, user]);
+
+  const handleViewChange = (view: ViewType) => {
+    if ((view === 'orders' || view === 'warranty' || view === 'chat') && !user) {
+      setCurrentView('welcome');
+      alert('Vui lòng đăng nhập để sử dụng tính năng này');
+      return;
+    }
+    setCurrentView(view);
+    if (view === 'orders') {
+      fetchOrders();
+    } else if (view === 'warranty') {
+      fetchWarrantyProducts();
+    } else if (view === 'chat') {
+      fetchChatMessages();
+    }
+  };
 
   return (
     <>
@@ -91,7 +314,7 @@ export default function Botchat() {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-40 right-8 z-40 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+            className="fixed bottom-40 right-8 z-[60] w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
           >
             {/* Header */}
             <div className="bg-gradient-to-r from-sky-500 to-sky-400 text-white p-4">
@@ -108,52 +331,201 @@ export default function Botchat() {
 
             {/* Messages */}
             <div className="h-80 overflow-y-auto p-4 bg-gray-50">
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-4 h-4 text-sky-500" />
+              {currentView === 'welcome' && (
+                <div className="space-y-4">
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-4 h-4 text-sky-500" />
+                    </div>
+                    <div className="bg-white rounded-lg rounded-tl-none p-3 shadow-sm max-w-[80%]">
+                      <p className="text-sm text-gray-700">
+                        Xin chào! Tôi có thể giúp gì cho bạn?
+                      </p>
+                    </div>
                   </div>
-                  <div className="bg-white rounded-lg rounded-tl-none p-3 shadow-sm max-w-[80%]">
-                    <p className="text-sm text-gray-700">
-                      Xin chào! Tôi có thể giúp gì cho bạn?
-                    </p>
-                  </div>
-                </div>
 
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-4 h-4 text-sky-500" />
-                  </div>
-                  <div className="bg-white rounded-lg rounded-tl-none p-3 shadow-sm max-w-[80%]">
-                    <p className="text-sm text-gray-700 mb-2">
-                      Bạn quan tâm đến:
-                    </p>
-                    <div className="space-y-2">
-                      <motion.button 
-                        className="block w-full text-left text-sm bg-gradient-to-r from-sky-50 to-blue-50 hover:from-sky-100 hover:to-blue-100 rounded-lg px-3 py-2 transition-all flex items-center gap-2 border border-sky-200 hover:border-sky-400 hover:shadow-md"
-                        whileHover={{ scale: 1.02, x: 3, transition: { duration: 0.15 } }}
-                        whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
-                      >
-                        <Package className="w-4 h-4 text-sky-600" /> Tra cứu đơn hàng
-                      </motion.button>
-                      <motion.button 
-                        className="block w-full text-left text-sm bg-gradient-to-r from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 rounded-lg px-3 py-2 transition-all flex items-center gap-2 border border-orange-200 hover:border-orange-400 hover:shadow-md"
-                        whileHover={{ scale: 1.02, x: 3, transition: { duration: 0.15 } }}
-                        whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
-                      >
-                        <Tag className="w-4 h-4 text-orange-600" /> Khuyến mãi hot
-                      </motion.button>
-                      <motion.button 
-                        className="block w-full text-left text-sm bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 rounded-lg px-3 py-2 transition-all flex items-center gap-2 border border-emerald-200 hover:border-emerald-400 hover:shadow-md"
-                        whileHover={{ scale: 1.02, x: 3, transition: { duration: 0.15 } }}
-                        whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
-                      >
-                        <Settings className="w-4 h-4 text-emerald-600" /> Bảo hành sản phẩm
-                      </motion.button>
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-4 h-4 text-sky-500" />
+                    </div>
+                    <div className="bg-white rounded-lg rounded-tl-none p-3 shadow-sm max-w-[80%]">
+                      <p className="text-sm text-gray-700 mb-2">
+                        Bạn quan tâm đến:
+                      </p>
+                      <div className="space-y-2">
+                        <motion.button 
+                          onClick={() => handleViewChange('orders')}
+                          className="block w-full text-left text-sm bg-gradient-to-r from-sky-50 to-blue-50 hover:from-sky-100 hover:to-blue-100 rounded-lg px-3 py-2 transition-all flex items-center gap-2 border border-sky-200 hover:border-sky-400 hover:shadow-md"
+                          whileHover={{ scale: 1.02, x: 3, transition: { duration: 0.15 } }}
+                          whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
+                        >
+                          <Package className="w-4 h-4 text-sky-600" /> Tra cứu đơn hàng
+                        </motion.button>
+                        <motion.button 
+                          onClick={() => handleViewChange('warranty')}
+                          className="block w-full text-left text-sm bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 rounded-lg px-3 py-2 transition-all flex items-center gap-2 border border-emerald-200 hover:border-emerald-400 hover:shadow-md"
+                          whileHover={{ scale: 1.02, x: 3, transition: { duration: 0.15 } }}
+                          whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
+                        >
+                          <Settings className="w-4 h-4 text-emerald-600" /> Bảo hành sản phẩm
+                        </motion.button>
+                        <motion.button 
+                          onClick={() => handleViewChange('chat')}
+                          className="block w-full text-left text-sm bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 rounded-lg px-3 py-2 transition-all flex items-center gap-2 border border-purple-200 hover:border-purple-400 hover:shadow-md"
+                          whileHover={{ scale: 1.02, x: 3, transition: { duration: 0.15 } }}
+                          whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
+                        >
+                          <MessageCircle className="w-4 h-4 text-purple-600" /> Chat với admin
+                        </motion.button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {currentView === 'chat' && (
+                <div className="space-y-3 h-full flex flex-col">
+                  <div className="flex items-center gap-2 mb-2">
+                    <motion.button
+                      onClick={() => setCurrentView('welcome')}
+                      className="p-1 hover:bg-gray-200 rounded"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <ArrowLeft className="w-4 h-4 text-gray-600" />
+                    </motion.button>
+                    <h4 className="font-semibold text-gray-900">Chat với admin</h4>
+                  </div>
+                  <div className="space-y-2 flex-1 overflow-y-auto" id="chat-messages-container">
+                    {chatMessages.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <MessageCircle className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                        <p>Chưa có tin nhắn nào. Hãy gửi câu hỏi của bạn!</p>
+                      </div>
+                    ) : (
+                      chatMessages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`flex ${msg.is_from_user ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[80%] rounded-lg p-3 ${
+                              msg.is_from_user
+                                ? 'bg-sky-500 text-white rounded-tr-none'
+                                : 'bg-gray-200 text-gray-900 rounded-tl-none'
+                            }`}
+                          >
+                            <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                            <p className={`text-xs mt-1 ${msg.is_from_user ? 'text-sky-100' : 'text-gray-500'}`}>
+                              {new Date(msg.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {error && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+                      {error}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {currentView === 'orders' && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <motion.button
+                      onClick={() => setCurrentView('welcome')}
+                      className="p-1 hover:bg-gray-200 rounded"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <ArrowLeft className="w-4 h-4 text-gray-600" />
+                    </motion.button>
+                    <h4 className="font-semibold text-gray-900">Đơn hàng của bạn</h4>
+                  </div>
+                  {loading ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-sky-500 mx-auto mb-2"></div>
+                      Đang tải...
+                    </div>
+                  ) : orders.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <AlertCircle className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                      <p>Bạn chưa có đơn hàng nào</p>
+                    </div>
+                  ) : (
+                    orders.map((order) => (
+                      <div key={order.id} className="bg-white rounded-lg p-3 border border-gray-200">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-semibold text-sm text-gray-900">#{order.order_number}</p>
+                            <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('vi-VN')}</p>
+                          </div>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                            order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {statusLabels[order.status]}
+                          </span>
+                        </div>
+                        <p className="text-sm font-bold text-gray-900">{new Intl.NumberFormat('vi-VN').format(order.final_amount)}đ</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {currentView === 'warranty' && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <motion.button
+                      onClick={() => setCurrentView('welcome')}
+                      className="p-1 hover:bg-gray-200 rounded"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <ArrowLeft className="w-4 h-4 text-gray-600" />
+                    </motion.button>
+                    <h4 className="font-semibold text-gray-900">Bảo hành sản phẩm</h4>
+                  </div>
+                  {loading ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-sky-500 mx-auto mb-2"></div>
+                      Đang tải...
+                    </div>
+                  ) : warrantyProducts.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <AlertCircle className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                      <p>Bạn chưa có sản phẩm nào để bảo hành</p>
+                    </div>
+                  ) : (
+                    warrantyProducts.map((product: any, idx) => (
+                      <motion.div
+                        key={`${product.id}-${idx}`}
+                        onClick={() => {
+                          setIsOpen(false);
+                          router.push('/home#san-pham');
+                        }}
+                        className={`bg-white rounded-lg p-3 border cursor-pointer hover:shadow-md transition-all ${product.isExpired ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'}`}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <p className="font-semibold text-sm text-gray-900">{product.name}</p>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${product.isExpired ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                            {product.isExpired ? 'Đã hết hạn bảo hành' : 'Còn bảo hành'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600">Mua ngày: {new Date(product.orderDate).toLocaleDateString('vi-VN')}</p>
+                        <p className="text-xs text-gray-600">Hết hạn: {new Date(product.warrantyExpiry).toLocaleDateString('vi-VN')}</p>
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Input */}
@@ -163,15 +535,54 @@ export default function Botchat() {
                   type="text"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Viết câu hỏi của bạn tại đây"
-                  className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 transition-all hover:border-sky-300"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (currentView === 'chat') {
+                        sendMessage();
+                      }
+                    }
+                  }}
+                  placeholder={
+                    currentView === 'chat'
+                      ? "Nhập tin nhắn của bạn..."
+                      : "Viết câu hỏi của bạn tại đây"
+                  }
+                  disabled={currentView === 'chat' && sendingMessage}
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 transition-all hover:border-sky-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
                 <motion.button 
-                  className="bg-gradient-to-r from-sky-500 to-blue-600 text-white p-2 rounded-lg hover:shadow-lg transition-all"
-                  whileHover={{ scale: 1.1, transition: { duration: 0.15 } }}
-                  whileTap={{ scale: 0.9, transition: { duration: 0.1 } }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Send button clicked', { currentView, message: message.trim(), sendingMessage, user, hasMessage: !!message.trim() });
+                    if (currentView === 'chat') {
+                      sendMessage();
+                    } else {
+                      console.log('Not in chat view, switching to chat...', currentView);
+                      if (user) {
+                        handleViewChange('chat');
+                        // Wait a bit then send if message exists
+                        setTimeout(() => {
+                          if (message.trim()) {
+                            sendMessage();
+                          }
+                        }, 100);
+                      } else {
+                        alert('Vui lòng đăng nhập để gửi tin nhắn');
+                      }
+                    }
+                  }}
+                  disabled={sendingMessage}
+                  className="bg-gradient-to-r from-sky-500 to-blue-600 text-white p-2 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  whileHover={{ scale: !sendingMessage ? 1.1 : 1, transition: { duration: 0.15 } }}
+                  whileTap={{ scale: !sendingMessage ? 0.9 : 1, transition: { duration: 0.1 } }}
                 >
-                  <Send className="w-5 h-5" />
+                  {sendingMessage ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
                 </motion.button>
               </div>
             </div>

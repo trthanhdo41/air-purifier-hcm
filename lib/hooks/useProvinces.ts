@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface Province {
   code: string;
@@ -35,35 +35,99 @@ export function useProvinces(): UseProvincesReturn {
   const [loading, setLoading] = useState(false);
   const [loadingProvinces, setLoadingProvinces] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const controllersRef = useRef<{ provinces?: AbortController; districts?: AbortController; wards?: AbortController }>({});
 
   useEffect(() => {
-    const fetchProvinces = async () => {
+    let mounted = true;
+    const run = async () => {
       setLoadingProvinces(true);
       setError(null);
+      
+      // Try cache first
       try {
-        const response = await fetch('https://provinces.open-api.vn/api/p/');
-        if (!response.ok) throw new Error('Failed to fetch provinces');
+        const cached = localStorage.getItem('vn_provinces_cache');
+        if (cached) {
+          const cachedData = JSON.parse(cached);
+          if (cachedData && Array.isArray(cachedData) && cachedData.length > 0) {
+            setProvinces(cachedData);
+            setLoadingProvinces(false);
+            // Load fresh data in background
+          }
+        }
+      } catch {}
+      
+      try {
+        if (controllersRef.current.provinces) controllersRef.current.provinces.abort();
+        controllersRef.current.provinces = new AbortController();
+        const timeout = setTimeout(() => controllersRef.current.provinces?.abort(), 10000);
         
-        const data = await response.json();
-        const hanoi = data.find((p: any) => p.name === 'Thành phố Hà Nội');
-        const hcm = data.find((p: any) => p.name === 'Thành phố Hồ Chí Minh');
-        const danang = data.find((p: any) => p.name === 'Thành phố Đà Nẵng');
+        // Chỉ dùng 1 API duy nhất
+        const res = await fetch('https://vn-public-apis.fpo.vn/provinces/getAll?limit=-1', {
+          signal: controllersRef.current.provinces.signal
+        });
         
-        const filteredProvinces = [
-          { code: hcm?.code != null ? String(hcm.code) : '', name: 'Thành phố Hồ Chí Minh' },
-          { code: hanoi?.code != null ? String(hanoi.code) : '', name: 'Thành phố Hà Nội' },
-          { code: danang?.code != null ? String(danang.code) : '', name: 'Thành phố Đà Nẵng' },
-        ].filter(p => p.code);
+        clearTimeout(timeout);
         
-        setProvinces(filteredProvinces);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        
+        const data = await res.json();
+        const list = Array.isArray(data?.data?.data) ? data.data.data : Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+        
+        const priorityProvinces = [
+          'Thành phố Hồ Chí Minh',
+          'Thành phố Hà Nội',
+          'Thành phố Đà Nẵng',
+          'Thành phố Cần Thơ',
+          'Thành phố Hải Phòng',
+        ];
+        
+        const allProvinces = list.map((p: any) => ({
+          code: String(p.code ?? p?.ProvinceCode ?? p?.id ?? ''),
+          name: p.name ?? p?.ProvinceName ?? ''
+        })).filter((x: any) => x.name && x.code);
+        
+        allProvinces.sort((a: Province, b: Province) => {
+          const aPriority = priorityProvinces.indexOf(a.name);
+          const bPriority = priorityProvinces.indexOf(b.name);
+          if (aPriority !== -1 && bPriority !== -1) return aPriority - bPriority;
+          if (aPriority !== -1) return -1;
+          if (bPriority !== -1) return 1;
+          return a.name.localeCompare(b.name, 'vi');
+        });
+        
+        if (mounted) {
+          setProvinces(allProvinces);
+          try {
+            localStorage.setItem('vn_provinces_cache', JSON.stringify(allProvinces));
+          } catch {}
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+        if (mounted) {
+          setError(err instanceof Error ? err.message : 'Không thể tải danh sách tỉnh thành');
+          try {
+            const cached = localStorage.getItem('vn_provinces_cache');
+            if (cached) {
+              const cachedData = JSON.parse(cached);
+              if (cachedData && Array.isArray(cachedData) && cachedData.length > 0) {
+                setProvinces(cachedData);
+              }
+            }
+          } catch {}
+        }
       } finally {
-        setLoadingProvinces(false);
+        if (mounted) {
+          setLoadingProvinces(false);
+        }
       }
     };
-
-    fetchProvinces();
+    run();
+    return () => {
+      mounted = false;
+      controllersRef.current.provinces?.abort();
+    };
   }, []);
 
   const fetchDistricts = useCallback(async (provinceCode: string) => {
@@ -76,19 +140,41 @@ export function useProvinces(): UseProvincesReturn {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`https://provinces.open-api.vn/api/p/${provinceCode}/?depth=2`);
-      if (!response.ok) throw new Error('Failed to fetch districts');
+      if (controllersRef.current.districts) controllersRef.current.districts.abort();
+      controllersRef.current.districts = new AbortController();
+      const timeout = setTimeout(() => controllersRef.current.districts?.abort(), 10000);
       
-      const data = await response.json();
-      const districtsData = data.districts?.map((d: any) => ({
-        code: String(d.code),
-        name: d.name,
-      })) || [];
+      // Chỉ dùng 1 API duy nhất
+      const res = await fetch(
+        `https://vn-public-apis.fpo.vn/districts/getByProvince?provinceCode=${provinceCode}&limit=-1`,
+        { signal: controllersRef.current.districts.signal }
+      );
+      
+      clearTimeout(timeout);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
+      const data = await res.json();
+      const list = Array.isArray(data?.data?.data) 
+        ? data.data.data 
+        : Array.isArray(data?.data) 
+          ? data.data 
+          : Array.isArray(data) 
+            ? data 
+            : [];
+      
+      const districtsData = list.map((d: any) => ({
+        code: String(d.code ?? d?.DistrictCode ?? ''),
+        name: d.name ?? d?.DistrictName ?? '',
+      })).filter((d: any) => d.code && d.name);
       
       setDistricts(districtsData);
       setWards([]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Không thể tải danh sách quận/huyện');
       setDistricts([]);
     } finally {
       setLoading(false);
@@ -104,18 +190,40 @@ export function useProvinces(): UseProvincesReturn {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`https://provinces.open-api.vn/api/d/${districtCode}/?depth=2`);
-      if (!response.ok) throw new Error('Failed to fetch wards');
+      if (controllersRef.current.wards) controllersRef.current.wards.abort();
+      controllersRef.current.wards = new AbortController();
+      const timeout = setTimeout(() => controllersRef.current.wards?.abort(), 10000);
       
-      const data = await response.json();
-      const wardsData = data.wards?.map((w: any) => ({
-        code: String(w.code),
-        name: w.name,
-      })) || [];
+      // Chỉ dùng 1 API duy nhất
+      const res = await fetch(
+        `https://vn-public-apis.fpo.vn/wards/getByDistrict?districtCode=${districtCode}&limit=-1`,
+        { signal: controllersRef.current.wards.signal }
+      );
+      
+      clearTimeout(timeout);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
+      const data = await res.json();
+      const list = Array.isArray(data?.data?.data) 
+        ? data.data.data 
+        : Array.isArray(data?.data) 
+          ? data.data 
+          : Array.isArray(data) 
+            ? data 
+            : [];
+      
+      const wardsData = list.map((w: any) => ({
+        code: String(w.code ?? w?.WardCode ?? ''),
+        name: w.name ?? w?.WardName ?? '',
+      })).filter((w: any) => w.code && w.name);
       
       setWards(wardsData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Không thể tải danh sách phường/xã');
       setWards([]);
     } finally {
       setLoading(false);

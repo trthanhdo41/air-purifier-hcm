@@ -39,19 +39,29 @@ export default function AddressSelector({
   } = useProvinces();
 
   useEffect(() => {
-    if (city) {
-      fetchDistricts(city);
-    } else {
-      resetDistricts();
-    }
+    // Debounce để tránh gọi API quá nhiều
+    const timeoutId = setTimeout(() => {
+      if (city) {
+        fetchDistricts(city);
+      } else {
+        resetDistricts();
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
   }, [city, fetchDistricts, resetDistricts]);
 
   useEffect(() => {
-    if (district) {
-      fetchWards(district);
-    } else {
-      resetWards();
-    }
+    // Debounce để tránh gọi API quá nhiều
+    const timeoutId = setTimeout(() => {
+      if (district) {
+        fetchWards(district);
+      } else {
+        resetWards();
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
   }, [district, fetchWards, resetWards]);
 
   const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -109,7 +119,6 @@ export default function AddressSelector({
           onChange={handleDistrictChange}
           disabled={loading || !city || districts.length === 0}
           className="w-full min-w-0 md:min-w-[180px] px-4 py-3 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-2 focus:ring-sky-100 outline-none disabled:bg-gray-50 disabled:cursor-not-allowed cursor-pointer appearance-none bg-white relative z-0 overflow-hidden text-ellipsis whitespace-nowrap"
-          style={{ pointerEvents: loading || !city || districts.length === 0 ? 'none' : 'auto' }}
         >
           <option value="">Chọn quận/huyện</option>
           {districts.map((dist) => (
@@ -131,7 +140,6 @@ export default function AddressSelector({
           onChange={handleWardChange}
           disabled={loading || !district || wards.length === 0}
           className="w-full min-w-0 md:min-w-[180px] px-4 py-3 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-2 focus:ring-sky-100 outline-none disabled:bg-gray-50 disabled:cursor-not-allowed cursor-pointer appearance-none bg-white relative z-0 overflow-hidden text-ellipsis whitespace-nowrap"
-          style={{ pointerEvents: loading || !district || wards.length === 0 ? 'none' : 'auto' }}
         >
           <option value="">Chọn phường/xã</option>
           {wards.map((w) => (

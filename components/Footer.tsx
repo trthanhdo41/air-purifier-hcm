@@ -3,12 +3,8 @@ import Link from "next/link";
 
 export default function Footer() {
   const paymentMethods = [
-    { name: "Visa", Icon: CreditCard },
-    { name: "Mastercard", Icon: CreditCard },
-    { name: "MoMo", Icon: Smartphone },
-    { name: "ZaloPay", Icon: Wallet },
-    { name: "VNPay", Icon: Wallet },
-    { name: "Kredivo", Icon: Building2 },
+    { name: "Thanh toán khi nhận hàng", Icon: Wallet },
+    { name: "Thanh toán online - Chuyển khoản", Icon: CreditCard },
   ];
 
   return (

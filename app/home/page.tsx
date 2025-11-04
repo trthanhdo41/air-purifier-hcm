@@ -3,22 +3,19 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BrandLogos from "@/components/sections/BrandLogos";
-import QuickCategories from "@/components/sections/QuickCategories";
 import CategoryTabs from "@/components/sections/CategoryTabs";
 import InfoSection from "@/components/sections/InfoSection";
 import FAQ from "@/components/sections/FAQ";
 import UserQA from "@/components/sections/UserQA";
 import Botchat from "@/components/Botchat";
-import { Phone, Wind, Shield, Zap, Sparkles } from "lucide-react";
+import { Phone, Wind, Shield, Zap, Sparkles, MessageCircle, Mail } from "lucide-react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 
 export default function HomePage() {
-  const [displayedText, setDisplayedText] = useState("");
-  const [displayedDesc, setDisplayedDesc] = useState("");
   const [textIndex, setTextIndex] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [statsCount, setStatsCount] = useState({
     products: 0,
     customers: 0,
@@ -40,51 +37,49 @@ export default function HomePage() {
     "Giải pháp hoàn hảo cho không khí trong nhà. Hoạt động êm ái, tiết kiệm điện năng hiệu quả."
   ];
 
+  // Change text every 6 seconds with smooth fade transition
   useEffect(() => {
-    let currentIndex = 0;
+    const interval = setInterval(() => {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setTextIndex((prev) => (prev + 1) % headlines.length);
+        setTimeout(() => setIsTransitioning(false), 50);
+      }, 300);
+    }, 6000);
     
-    const typeText = () => {
-      const currentHeadline = headlines[textIndex];
-      const currentDesc = descriptions[textIndex];
-      
-      // Type headline
-      const typeHeadline = setInterval(() => {
-        if (currentIndex <= currentHeadline.length) {
-          setDisplayedText(currentHeadline.slice(0, currentIndex));
-          currentIndex++;
-        } else {
-          clearInterval(typeHeadline);
-          currentIndex = 0;
+    return () => clearInterval(interval);
+  }, []);
+
+  // Handle hash navigation when page loads or hash changes
+  useEffect(() => {
+    const handleHashScroll = () => {
+      const hash = window.location.hash;
+      if (hash) {
+        const sectionId = hash.substring(1); // Remove #
+        // Use multiple attempts to ensure element is rendered
+        const attemptScroll = (attempts = 0) => {
+          if (attempts > 10) return; // Max 10 attempts (1 second)
           
-          // Type description
-          const typeDesc = setInterval(() => {
-            if (currentIndex <= currentDesc.length) {
-              setDisplayedDesc(currentDesc.slice(0, currentIndex));
-              currentIndex++;
-            } else {
-              clearInterval(typeDesc);
-              
-              // Wait 4 seconds, then slide to next
-              setTimeout(() => {
-                setIsAnimating(true);
-                // Wait for animation to complete
-                setTimeout(() => {
-                  setIsAnimating(false);
-                  setDisplayedText("");
-                  setDisplayedDesc("");
-                  setTextIndex((prev) => (prev + 1) % headlines.length);
-                }, 800); // Match animation duration
-              }, 4000);
-            }
-          }, 20);
-        }
-      }, 60);
+          const el = document.getElementById(sectionId);
+          if (el) {
+            const headerOffset = 110;
+            const rect = el.getBoundingClientRect();
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const y = rect.top + scrollTop - headerOffset;
+            window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+          } else {
+            setTimeout(() => attemptScroll(attempts + 1), 100);
+          }
+        };
+        
+        setTimeout(() => attemptScroll(), 100);
+      }
     };
-    
-    if (!isAnimating && displayedText === "" && displayedDesc === "") {
-      typeText();
-    }
-  }, [textIndex, isAnimating, displayedText, displayedDesc]);
+
+    handleHashScroll();
+    window.addEventListener('hashchange', handleHashScroll);
+    return () => window.removeEventListener('hashchange', handleHashScroll);
+  }, []);
 
   // Counter animation for stats
   useEffect(() => {
@@ -155,49 +150,52 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                {/* Headline - Typewriter with Slide Animation */}
-                <div className="overflow-hidden min-h-[2.5em] mb-3 sm:mb-4 md:mb-6">
-                  <motion.h1 
+                {/* Headline - Fade Transition */}
+                <div className="mb-3 sm:mb-4 md:mb-6">
+                  <h1 
                     key={`headline-${textIndex}`}
-                    initial={{ y: 60, opacity: 0 }}
-                    animate={{ 
-                      y: isAnimating ? -60 : 0, 
-                      opacity: isAnimating ? 0 : 1 
-                    }}
-                    transition={{ duration: 0.8, ease: "easeInOut" }}
-                    className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight typewriter-text"
+                    className={`text-2xl sm:text-3xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight transition-opacity duration-300 ${
+                      isTransitioning ? 'opacity-0' : 'opacity-100'
+                    }`}
                   >
-                    {displayedText.split('\n').map((line, index) => (
+                    {headlines[textIndex].split('\n').map((line, index) => (
                       <span key={index}>
                         {index === 0 ? line : <span className="text-sky-300 sm:text-sky-200">{line}</span>}
                         {index === 0 && <br />}
                       </span>
                     ))}
-                    {displayedText && <span className="animate-pulse ml-0.5">|</span>}
-                  </motion.h1>
+                  </h1>
                 </div>
 
-                {/* Description - Typewriter with Slide Animation */}
-                <div className="overflow-hidden min-h-[3em] mb-5 sm:mb-6 md:mb-8">
-                  <motion.p 
+                {/* Description - Fade Transition */}
+                <div className="mb-5 sm:mb-6 md:mb-8">
+                  <p 
                     key={`desc-${textIndex}`}
-                    initial={{ y: 40, opacity: 0 }}
-                    animate={{ 
-                      y: isAnimating ? -40 : 0, 
-                      opacity: isAnimating ? 0 : 1 
-                    }}
-                    transition={{ duration: 0.8, ease: "easeInOut", delay: 0.1 }}
-                    className="text-xs sm:text-sm md:text-base lg:text-xl xl:text-2xl text-white/95 leading-relaxed max-w-3xl typewriter-text"
+                    className={`text-xs sm:text-sm md:text-base lg:text-xl xl:text-2xl text-white/95 leading-relaxed max-w-3xl transition-opacity duration-300 ${
+                      isTransitioning ? 'opacity-0' : 'opacity-100'
+                    }`}
                   >
-                    {displayedDesc}
-                    {displayedDesc && <span className="animate-pulse ml-0.5">|</span>}
-                  </motion.p>
+                    {descriptions[textIndex]}
+                  </p>
                 </div>
 
                 {/* CTAs - Mobile Optimized */}
                 <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 md:gap-4 mb-6 sm:mb-8 md:mb-10">
                   <motion.a
-                    href="#products"
+                    href="#san-pham"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const element = document.getElementById('san-pham');
+                      if (element) {
+                        const headerOffset = 150;
+                        const elementPosition = element.getBoundingClientRect().top;
+                        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                        window.scrollTo({
+                          top: offsetPosition,
+                          behavior: 'smooth'
+                        });
+                      }
+                    }}
                     whileHover={{ scale: 1.08, y: -3 }}
                     whileTap={{ scale: 0.92 }}
                     transition={{ duration: 0.2, ease: "easeInOut" }}
@@ -441,9 +439,6 @@ export default function HomePage() {
           <BrandLogos />
         </div>
 
-        {/* Quick Categories */}
-        <QuickCategories />
-
         {/* Category Tabs with Products */}
         <div id="san-pham">
           <CategoryTabs />
@@ -463,14 +458,116 @@ export default function HomePage() {
         <div id="khach-hang">
           <UserQA />
         </div>
+
+        {/* Tư vấn Section */}
+        <section id="tu-van" className="py-16 md:py-20 bg-gradient-to-br from-sky-50 via-white to-blue-50 relative overflow-hidden">
+          {/* Background decoration */}
+          <div className="absolute inset-0 opacity-5">
+            <div className="absolute inset-0" style={{
+              backgroundImage: 'linear-gradient(#0284c7 1px, transparent 1px), linear-gradient(90deg, #0284c7 1px, transparent 1px)',
+              backgroundSize: '40px 40px'
+            }} />
+          </div>
+
+          <div className="container mx-auto px-4 relative z-10">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-12"
+            >
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+                Cần tư vấn?
+              </h2>
+              <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+                Đội ngũ chuyên gia của chúng tôi sẵn sàng hỗ trợ bạn 24/7
+              </p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {/* Hotline */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                whileHover={{ scale: 1.05, y: -5 }}
+                className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all border border-gray-100 text-center"
+              >
+                <div className="w-16 h-16 bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Phone className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Hotline</h3>
+                <a href="tel:18002097" className="text-2xl font-bold text-sky-600 hover:text-sky-700 transition-colors block mb-3">
+                  1800 2097
+                </a>
+                <p className="text-sm text-gray-600">24/7 miễn phí</p>
+              </motion.div>
+
+              {/* Chat */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                whileHover={{ scale: 1.05, y: -5 }}
+                className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all border border-gray-100 text-center"
+              >
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <MessageCircle className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Chat trực tuyến</h3>
+                <button className="text-sky-600 hover:text-sky-700 font-semibold mb-3">
+                  Nhấn để chat
+                </button>
+                <p className="text-sm text-gray-600">Phản hồi ngay lập tức</p>
+              </motion.div>
+
+              {/* Email */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                whileHover={{ scale: 1.05, y: -5 }}
+                className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all border border-gray-100 text-center"
+              >
+                <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Mail className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Email</h3>
+                <a href="mailto:info@hoithoxanh.com" className="text-sky-600 hover:text-sky-700 font-semibold mb-3 block break-all">
+                  info@hoithoxanh.com
+                </a>
+                <p className="text-sm text-gray-600">Phản hồi trong 24h</p>
+              </motion.div>
+            </div>
+
+            {/* CTA Button */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="text-center mt-12"
+            >
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="gradient-primary text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all"
+              >
+                Để lại thông tin, chúng tôi sẽ liên hệ
+              </motion.button>
+            </motion.div>
+          </div>
+        </section>
       </main>
 
       <Footer />
 
       {/* Botchat */}
-      <div id="tu-van">
-        <Botchat />
-      </div>
+      <Botchat />
     </div>
   );
 }

@@ -4,10 +4,11 @@ import { Product } from "@/types";
 import { formatPrice } from "@/lib/utils";
 import { ShoppingCart, Star, Heart, Eye, Wind, Battery, Zap, Flame, Sparkles, Tag, Truck } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCartStore } from "@/lib/stores/cart";
 import Toast from "@/components/Toast";
 
@@ -23,7 +24,21 @@ export default function ProductCard({ product, index, compact = false }: Product
   const [showToast, setShowToast] = useState(false);
   const { addItem } = useCartStore();
   const discountPercent = product.discount || 0;
-  const hasDiscount = discountPercent > 0;
+  const originalPriceValue = (product as any).originalPrice ?? (product as any).original_price;
+  const hasDiscount = discountPercent > 0 || (originalPriceValue && originalPriceValue > product.price);
+
+  // Load wishlist from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
+        setIsWishlisted(wishlist.includes(product.id));
+      } catch (e) {
+        // If localStorage is corrupted, start fresh
+        setIsWishlisted(false);
+      }
+    }
+  }, [product.id]);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -31,15 +46,48 @@ export default function ProductCard({ product, index, compact = false }: Product
     setShowToast(true);
   };
 
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
+      const newWishlisted = !isWishlisted;
+      
+      if (newWishlisted) {
+        // Thêm vào wishlist nếu chưa có
+        if (!wishlist.includes(product.id)) {
+          wishlist.push(product.id);
+          localStorage.setItem('wishlist', JSON.stringify(wishlist));
+          setIsWishlisted(true);
+          // Trigger custom event để Header cập nhật số lượng
+          window.dispatchEvent(new Event('wishlistUpdated'));
+        }
+      } else {
+        // Xóa khỏi wishlist
+        const updatedWishlist = wishlist.filter((id: string) => id !== product.id);
+        localStorage.setItem('wishlist', JSON.stringify(updatedWishlist));
+        setIsWishlisted(false);
+        // Trigger custom event để Header cập nhật số lượng
+        window.dispatchEvent(new Event('wishlistUpdated'));
+      }
+    } catch (e) {
+      console.error('Error updating wishlist:', e);
+    }
+  };
+
   // Compact mode - CellphoneS style
   if (compact) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.02, duration: 0.3 }}
-        className="group relative bg-white rounded-lg overflow-hidden border border-gray-200 hover:border-sky-400 hover:shadow-lg transition-all duration-200 cursor-pointer"
-      >
+      <Link href={`/product/${product.id}`}>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: index * 0.02, duration: 0.3 }}
+          className="group relative bg-white rounded-lg overflow-hidden border border-gray-200 hover:border-sky-400 hover:shadow-lg transition-all duration-200 cursor-pointer"
+        > 
         {/* Badges */}
         <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
           {product.badge === 'hot' && (
@@ -57,13 +105,14 @@ export default function ProductCard({ product, index, compact = false }: Product
             src={product.image}
             alt={product.name}
             fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
             className={`object-cover group-hover:scale-105 transition-transform duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
             onLoad={() => setImageLoaded(true)}
           />
         </div>
 
         {/* Content - Compact */}
-        <div className="p-3">
+        <div className="p-3 relative z-10">
           {/* Name */}
           <h3 className="text-sm font-medium line-clamp-2 h-10 text-gray-900 mb-3 group-hover:text-sky-500 transition-colors">
             {product.name}
@@ -96,10 +145,10 @@ export default function ProductCard({ product, index, compact = false }: Product
             <div className="text-sky-500 font-bold text-lg">
               {formatPrice(product.price)}
             </div>
-            {hasDiscount && product.originalPrice && (
+            {hasDiscount && originalPriceValue && (
               <div className="flex items-center gap-2">
                 <div className="text-gray-400 text-xs line-through">
-                  {formatPrice(product.originalPrice)}
+                  {formatPrice(originalPriceValue)}
                 </div>
                 <div className="text-[10px] bg-sky-50 text-sky-500 px-1.5 py-0.5 rounded">
                   Trả góp 0%
@@ -119,8 +168,12 @@ export default function ProductCard({ product, index, compact = false }: Product
 
           {/* Add to Cart Button */}
           <motion.button
-            onClick={handleAddToCart}
-            className="w-full bg-sky-500 hover:bg-sky-600 text-white py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddToCart(e);
+            }}
+            className="relative z-10 w-full bg-sky-500 hover:bg-sky-600 text-white py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
@@ -137,22 +190,24 @@ export default function ProductCard({ product, index, compact = false }: Product
             onClose={() => setShowToast(false)}
           />
         )}
-      </motion.div>
+        </motion.div>
+      </Link>
     );
   }
 
   // Normal mode - Original design
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.03, duration: 0.4 }}
-      className="group relative bg-white rounded-2xl overflow-hidden shadow-soft hover:shadow-large transition-all duration-300 border border-gray-100/50 card-hover"
-    >
+    <Link href={`/product/${product.id}`}>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.03, duration: 0.4 }}
+        className="group relative bg-white rounded-2xl overflow-hidden shadow-soft hover:shadow-large transition-all duration-300 border border-gray-100/50 card-hover cursor-pointer"
+      >
       {/* Quick Actions - shown on hover */}
       <div className="absolute top-3 right-3 z-20 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <motion.button
-          onClick={() => setIsWishlisted(!isWishlisted)}
+          onClick={handleWishlist}
           className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
             isWishlisted 
               ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white' 
@@ -211,6 +266,7 @@ export default function ProductCard({ product, index, compact = false }: Product
           src={product.image}
           alt={product.name}
           fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className={`object-cover group-hover:scale-105 transition-transform duration-500 ${
             imageLoaded ? 'opacity-100' : 'opacity-0'
           }`}
@@ -270,13 +326,13 @@ export default function ProductCard({ product, index, compact = false }: Product
               {formatPrice(product.price)}
             </span>
           </div>
-          {hasDiscount && product.originalPrice && (
+          {hasDiscount && originalPriceValue && (
             <div className="flex items-center gap-2">
               <span className="text-gray-400 text-sm line-through">
-                {formatPrice(product.originalPrice)}
+                {formatPrice(originalPriceValue)}
               </span>
               <span className="text-xs font-semibold text-sky-500 bg-sky-50 px-2 py-0.5 rounded-full">
-                Tiết kiệm {formatPrice(product.originalPrice - product.price)}
+                Tiết kiệm {formatPrice(originalPriceValue - product.price)}
               </span>
             </div>
           )}
@@ -286,9 +342,14 @@ export default function ProductCard({ product, index, compact = false }: Product
         <motion.div
           whileHover={{ scale: 1.02, transition: { duration: 0.15 } }}
           whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
+          className="relative z-10"
         >
           <Button 
-            onClick={handleAddToCart}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddToCart(e);
+            }}
             className="w-full group-hover:shadow-xl-colored bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 transition-all"
             size="lg"
           >
@@ -312,14 +373,15 @@ export default function ProductCard({ product, index, compact = false }: Product
         )}
       </div>
       
-      {/* Toast */}
-      {showToast && (
-        <Toast
-          message={`Đã thêm "${product.name}" vào giỏ hàng`}
-          type="success"
-          onClose={() => setShowToast(false)}
-        />
-      )}
-    </motion.div>
+        {/* Toast */}
+        {showToast && (
+          <Toast
+            message={`Đã thêm "${product.name}" vào giỏ hàng`}
+            type="success"
+            onClose={() => setShowToast(false)}
+          />
+        )}
+      </motion.div>
+    </Link>
   );
 }
