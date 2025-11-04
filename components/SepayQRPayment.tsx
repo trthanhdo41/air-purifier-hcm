@@ -285,15 +285,9 @@ export default function SepayQRPayment({
             <div className="flex gap-3">
               <button
                 onClick={onCancel}
-                className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                className="w-full px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
               >
-                Hủy
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-lg font-medium hover:from-sky-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
-              >
-                Đã thanh toán
+                Hủy thanh toán
               </button>
             </div>
           </div>
