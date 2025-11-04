@@ -216,7 +216,6 @@ export default function CheckoutPage() {
 
             // Handle payment method
             if (formData.paymentMethod === 'sepay') {
-              setIsProcessingPayment(true);
               try {
                 const orderCode = orderData.order.order_number;
                 const res = await fetch(`/api/payment/sepay/create`, {
@@ -231,10 +230,8 @@ export default function CheckoutPage() {
                 });
                 const data = await res.json();
                 
-                setIsProcessingPayment(false);
-                
                 if (data?.success && data?.qrData) {
-                  // Hiển thị QR code modal
+                  // Hiển thị QR code modal ngay lập tức
                   setSepayQRData(data.qrData);
                   setShowSepayQR(true);
                   return;
@@ -244,7 +241,6 @@ export default function CheckoutPage() {
                 return;
               } catch (err) {
                 console.error('Sepay error:', err);
-                setIsProcessingPayment(false);
                 alert('Có lỗi xảy ra khi tạo thanh toán. Vui lòng thử lại.');
                 return;
               }
@@ -666,8 +662,6 @@ export default function CheckoutPage() {
       <LoginModal isOpen={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
       
       {/* Payment Processing Modal */}
-      {isProcessingPayment && <PaymentProcessing />}
-      
       {/* Sepay QR Payment Modal */}
       {showSepayQR && sepayQRData && (
         <SepayQRPayment

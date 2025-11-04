@@ -21,7 +21,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.json();
-    console.log('📩 Sepay Webhook received:', payload);
+    console.log('📩 Sepay Webhook received:', JSON.stringify(payload, null, 2));
 
     // Xác thực payload
     if (!payload.order_code || !payload.status) {
