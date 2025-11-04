@@ -202,9 +202,9 @@ export default function AdminOrdersPage() {
         <div className="text-xs font-semibold text-gray-500 uppercase flex items-center mr-2">Thanh toán:</div>
         {[
           { value: "all", label: "Tất cả" },
-          { value: "paid", label: "✓ Đã thanh toán" },
-          { value: "pending", label: "⏳ Chờ thanh toán" },
-          { value: "failed", label: "✗ Thất bại" },
+          { value: "paid", label: "Đã thanh toán" },
+          { value: "pending", label: "Chờ thanh toán" },
+          { value: "failed", label: "Thất bại" },
         ].map((payment) => (
           <motion.button
             key={payment.value}
@@ -304,9 +304,9 @@ export default function AdminOrdersPage() {
                           ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
                           : 'bg-red-100 text-red-800 border border-red-200'
                       }`}>
-                        {order.payment_status === 'paid' ? '✓ Đã thanh toán' : 
-                         order.payment_status === 'pending' ? '⏳ Chờ thanh toán' : 
-                         '✗ Thất bại'}
+                        {order.payment_status === 'paid' ? 'Đã thanh toán' : 
+                         order.payment_status === 'pending' ? 'Chờ thanh toán' : 
+                         'Thất bại'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -419,7 +419,7 @@ export default function AdminOrdersPage() {
                           ? 'bg-orange-100 text-orange-800 border-2 border-orange-200' 
                           : 'bg-blue-100 text-blue-800 border-2 border-blue-200'
                       }`}>
-                        {selectedOrder.payment_method === 'cod' ? '💵 Thanh toán khi nhận hàng (COD)' : '🏦 Chuyển khoản ngân hàng'}
+                        {selectedOrder.payment_method === 'cod' ? 'Thanh toán khi nhận hàng (COD)' : 'Chuyển khoản ngân hàng'}
                       </span>
                     </div>
                     <div>
@@ -431,9 +431,9 @@ export default function AdminOrdersPage() {
                           ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-200'
                           : 'bg-red-100 text-red-800 border-2 border-red-200'
                       }`}>
-                        {selectedOrder.payment_status === 'paid' ? '✓ Đã thanh toán' : 
-                         selectedOrder.payment_status === 'pending' ? '⏳ Chờ thanh toán' : 
-                         '✗ Thanh toán thất bại'}
+                        {selectedOrder.payment_status === 'paid' ? 'Đã thanh toán' : 
+                         selectedOrder.payment_status === 'pending' ? 'Chờ thanh toán' : 
+                         'Thanh toán thất bại'}
                       </span>
                     </div>
                   </div>
