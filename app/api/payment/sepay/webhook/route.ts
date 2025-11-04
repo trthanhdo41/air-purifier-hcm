@@ -24,11 +24,13 @@ export async function POST(request: NextRequest) {
     console.log('📩 Sepay Webhook received:', JSON.stringify(payload, null, 2));
 
     // Extract order code từ nhiều nguồn có thể
-    // Sepay có thể gửi trong: content, description, transferContent, transaction_content, etc.
+    // Ưu tiên lấy từ field "code" (Sepay tự nhận diện)
+    // Nếu không có thì extract từ "content" (nội dung chuyển khoản)
     const orderCode = 
+      payload.code ||                          // Sepay tự nhận diện code thanh toán
       payload.order_code || 
       payload.orderCode ||
-      extractOrderCode(payload.content) ||
+      extractOrderCode(payload.content) ||     // Nội dung chuyển khoản
       extractOrderCode(payload.description) ||
       extractOrderCode(payload.transferContent) ||
       extractOrderCode(payload.transaction_content);
@@ -42,6 +44,12 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ Order code extracted:', orderCode);
+
+    // Chỉ xử lý giao dịch TIỀN VÀO
+    if (payload.transferType && payload.transferType !== 'in') {
+      console.log(`⏭️ Skip transferType: ${payload.transferType} (not "in")`);
+      return NextResponse.json({ success: true, message: 'Not money in transaction' });
+    }
 
     // Update order trong database
     const supabase = createAdminClient();
