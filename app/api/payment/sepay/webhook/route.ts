@@ -23,32 +23,25 @@ export async function POST(request: NextRequest) {
     const payload = await request.json();
     console.log('📩 Sepay Webhook received:', JSON.stringify(payload, null, 2));
 
-    // Xác thực payload
-    if (!payload.order_code || !payload.status) {
-      console.error('❌ Invalid webhook payload:', payload);
-      return NextResponse.json(
-        { success: false, error: 'Invalid payload' },
-        { status: 400 }
-      );
-    }
-
-    // Extract order code từ content hoặc order_code
-    // Sepay có thể gửi order_code trong nhiều format
-    const orderCode = payload.order_code || extractOrderCode(payload.content);
+    // Extract order code từ nhiều nguồn có thể
+    // Sepay có thể gửi trong: content, description, transferContent, transaction_content, etc.
+    const orderCode = 
+      payload.order_code || 
+      payload.orderCode ||
+      extractOrderCode(payload.content) ||
+      extractOrderCode(payload.description) ||
+      extractOrderCode(payload.transferContent) ||
+      extractOrderCode(payload.transaction_content);
 
     if (!orderCode) {
-      console.error('❌ Order code not found in payload');
+      console.error('❌ Order code not found in payload. Full payload:', payload);
       return NextResponse.json(
-        { success: false, error: 'Order code not found' },
+        { success: false, error: 'Order code not found', received: payload },
         { status: 400 }
       );
     }
 
-    // Chỉ xử lý khi thanh toán thành công
-    if (payload.status !== 'success') {
-      console.log(`⏳ Payment status: ${payload.status}, waiting...`);
-      return NextResponse.json({ success: true, message: 'Status noted' });
-    }
+    console.log('✅ Order code extracted:', orderCode);
 
     // Update order trong database
     const supabase = createAdminClient();
@@ -78,20 +71,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify số tiền (optional, để đảm bảo chính xác)
-    if (payload.amount && payload.amount !== order.total_amount) {
+    const receivedAmount = payload.amount || payload.transferAmount || payload.value || 0;
+    if (receivedAmount && Math.abs(receivedAmount - order.final_amount) > 1) {
       console.warn(
-        `⚠️ Amount mismatch: Expected ${order.total_amount}, got ${payload.amount}`
+        `⚠️ Amount mismatch: Expected ${order.final_amount}, got ${receivedAmount}`
       );
-      // Có thể gửi email thông báo admin về sự khác biệt
     }
 
     // Update order status
+    const transactionId = 
+      payload.transaction_id || 
+      payload.transactionId || 
+      payload.id || 
+      payload.trans_id ||
+      `SEPAY-${Date.now()}`;
+
     const { error: updateError } = await supabase
       .from('orders')
       .update({
         payment_status: 'paid',
         status: 'processing', // Đơn hàng chuyển sang đang xử lý
-        transaction_id: payload.transaction_id || null,
+        transaction_id: transactionId,
         updated_at: new Date().toISOString(),
       })
       .eq('id', order.id);
