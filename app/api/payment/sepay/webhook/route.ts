@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
  * Sepay Webhook Handler
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update order trong database
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Tìm order theo order_number
     const { data: order, error: findError } = await supabase

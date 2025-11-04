@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Tạo phiên thanh toán Sepay
+ * Tạo thông tin thanh toán Sepay QR Code
  * 
  * Request body:
  * {
@@ -13,7 +13,14 @@ import { NextRequest, NextResponse } from 'next/server';
  * 
  * Response:
  * {
- *   url: string (URL redirect đến trang thanh toán Sepay)
+ *   success: boolean,
+ *   qrData: {
+ *     orderCode: string,
+ *     amount: number,
+ *     bankAccount: string,
+ *     bankName: string,
+ *     qrCodeUrl: string
+ *   }
  * }
  */
 
@@ -30,86 +37,40 @@ export async function POST(request: NextRequest) {
     }
 
     // Get Sepay credentials từ env
-    const sepayApiKey = process.env.SEPAY_API_KEY;
-    const sepayEndpoint = process.env.SEPAY_ENDPOINT || 'https://api.sepay.vn/v1/payment/create';
-    const returnUrl = process.env.SEPAY_RETURN_URL || `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/payment/sepay/return`;
-    const webhookUrl = process.env.SEPAY_WEBHOOK_URL || `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/payment/sepay/webhook`;
+    const bankAccount = process.env.SEPAY_BANK_ACCOUNT;
+    const bankName = process.env.SEPAY_BANK_NAME;
 
-    if (!sepayApiKey) {
-      console.error('❌ SEPAY_API_KEY not configured');
+    if (!bankAccount || !bankName) {
+      console.error('❌ Sepay bank config not found');
       return NextResponse.json(
         { success: false, error: 'Payment gateway not configured' },
         { status: 500 }
       );
     }
 
-    // Prepare Sepay request payload
-    const sepayPayload = {
-      amount: Math.round(amount), // Đảm bảo là số nguyên
-      order_code: orderCode,
-      description: description || `Thanh toan don hang ${orderCode}`,
-      return_url: `${returnUrl}?order_code=${orderCode}&order_id=${orderId}`,
-      webhook_url: webhookUrl,
-      // Thêm các field khác theo API Sepay nếu cần
-      metadata: {
-        order_id: orderId,
-        order_code: orderCode,
-      },
-    };
+    // Tạo QR Code URL
+    const qrCodeUrl = `https://qr.sepay.vn/img?acc=${bankAccount}&bank=${bankName}&amount=${Math.round(amount)}&des=${orderCode}`;
 
-    console.log('📤 Creating Sepay payment:', {
+    console.log('✅ Sepay QR payment created:', {
       orderCode,
       amount,
-      endpoint: sepayEndpoint,
-    });
-
-    // Call Sepay API
-    const response = await fetch(sepayEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sepayApiKey}`,
-      },
-      body: JSON.stringify(sepayPayload),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('❌ Sepay API error:', data);
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: data.message || 'Failed to create payment session' 
-        },
-        { status: response.status }
-      );
-    }
-
-    // Sepay trả về payment URL
-    if (!data.url && !data.payment_url) {
-      console.error('❌ No payment URL in Sepay response:', data);
-      return NextResponse.json(
-        { success: false, error: 'Invalid payment response' },
-        { status: 500 }
-      );
-    }
-
-    const paymentUrl = data.url || data.payment_url;
-
-    console.log('✅ Sepay payment created:', {
-      orderCode,
-      paymentUrl,
+      bankAccount,
+      bankName,
     });
 
     return NextResponse.json({
       success: true,
-      url: paymentUrl,
-      transaction_id: data.transaction_id,
+      qrData: {
+        orderCode,
+        amount: Math.round(amount),
+        bankAccount,
+        bankName,
+        qrCodeUrl,
+      }
     });
 
   } catch (error: any) {
-    console.error('❌ Error creating Sepay payment:', error);
+    console.error('❌ Error creating Sepay QR payment:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

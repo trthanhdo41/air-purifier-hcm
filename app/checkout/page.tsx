@@ -17,6 +17,7 @@ import LoginModal from "@/components/LoginModal";
 import AddressSelector from "@/components/AddressSelector";
 import { useProvinces } from "@/lib/hooks/useProvinces";
 import PaymentProcessing from "@/components/PaymentProcessing";
+import SepayQRPayment from "@/components/SepayQRPayment";
 
 export default function CheckoutPage() {
   const { items, buyNowItems, getTotalItems, getTotalPrice, getTotalSavings, clearBuyNowItems } = useCartStore();
@@ -26,6 +27,8 @@ export default function CheckoutPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [showSepayQR, setShowSepayQR] = useState(false);
+  const [sepayQRData, setSepayQRData] = useState<any>(null);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -221,8 +224,7 @@ export default function CheckoutPage() {
               setIsProcessingPayment(true);
               try {
                 const orderCode = orderData.order.order_number;
-                const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-                const res = await fetch(`${apiBase}/api/payment/sepay/create`, {
+                const res = await fetch(`/api/payment/sepay/create`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ 
@@ -234,14 +236,15 @@ export default function CheckoutPage() {
                 });
                 const data = await res.json();
                 
-                if (data?.url) {
-                  // Delay một chút để show loading animation
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  window.location.href = data.url as string;
+                setIsProcessingPayment(false);
+                
+                if (data?.success && data?.qrData) {
+                  // Hiển thị QR code modal
+                  setSepayQRData(data.qrData);
+                  setShowSepayQR(true);
                   return;
                 }
                 
-                setIsProcessingPayment(false);
                 alert('Không thể tạo thanh toán. Vui lòng thử lại hoặc chọn phương thức khác.');
                 return;
               } catch (err) {
@@ -666,6 +669,24 @@ export default function CheckoutPage() {
       
       {/* Payment Processing Modal */}
       {isProcessingPayment && <PaymentProcessing />}
+      
+      {/* Sepay QR Payment Modal */}
+      {showSepayQR && sepayQRData && (
+        <SepayQRPayment
+          orderCode={sepayQRData.orderCode}
+          amount={sepayQRData.amount}
+          bankAccount={sepayQRData.bankAccount}
+          bankName={sepayQRData.bankName}
+          onSuccess={() => {
+            setShowSepayQR(false);
+            router.push(`/success?order=${sepayQRData.orderCode}`);
+          }}
+          onCancel={() => {
+            setShowSepayQR(false);
+            setSepayQRData(null);
+          }}
+        />
+      )}
     </div>
   );
 }
