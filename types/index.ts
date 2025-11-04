@@ -36,6 +36,7 @@ export interface Order {
   user_id?: string;
   order_number: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  payment_status: 'pending' | 'paid' | 'failed';
   total_amount: number;
   shipping_fee: number;
   discount_amount: number;
@@ -49,6 +50,7 @@ export interface Order {
   ward: string;
   note?: string;
   payment_method: string;
+  transaction_id?: string;
   created_at: string;
   updated_at?: string;
   items?: OrderItem[];
