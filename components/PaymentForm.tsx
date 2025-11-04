@@ -117,7 +117,7 @@ export default function PaymentForm({ paymentMethod, onPaymentMethodChange }: Pa
                   <div className="space-y-2">
                     <div className="flex items-start gap-2 text-xs text-gray-700">
                       <div className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">1</div>
-                      <span>Xác nhận đơn hàng và bấm <strong>"Đặt hàng"</strong></span>
+                      <span>Xác nhận đơn hàng và bấm <strong>&ldquo;Đặt hàng&rdquo;</strong></span>
                     </div>
                     <div className="flex items-start gap-2 text-xs text-gray-700">
                       <div className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">2</div>
