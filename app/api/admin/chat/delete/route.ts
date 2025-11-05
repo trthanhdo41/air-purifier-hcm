@@ -64,6 +64,15 @@ export async function POST(request: NextRequest) {
 
     if (delete_all) {
       // Delete all chat messages and AI history
+      // First get count before deletion
+      const { count: messagesCountBefore } = await supabase
+        .from('chat_messages')
+        .select('*', { count: 'exact', head: true });
+      
+      const { count: aiHistoryCountBefore } = await supabase
+        .from('ai_chat_history')
+        .select('*', { count: 'exact', head: true });
+
       const { error: messagesError } = await supabase
         .from('chat_messages')
         .delete()
@@ -72,10 +81,7 @@ export async function POST(request: NextRequest) {
       if (messagesError) {
         console.error('Error deleting all chat messages:', messagesError);
       } else {
-        const { count } = await supabase
-          .from('chat_messages')
-          .select('*', { count: 'exact', head: true });
-        deletedMessages = count || 0;
+        deletedMessages = messagesCountBefore || 0;
       }
 
       const { error: aiHistoryError } = await supabase
@@ -86,10 +92,7 @@ export async function POST(request: NextRequest) {
       if (aiHistoryError) {
         console.error('Error deleting all AI chat history:', aiHistoryError);
       } else {
-        const { count } = await supabase
-          .from('ai_chat_history')
-          .select('*', { count: 'exact', head: true });
-        deletedAIHistory = count || 0;
+        deletedAIHistory = aiHistoryCountBefore || 0;
       }
     } else if (user_id) {
       // Delete messages for specific user
