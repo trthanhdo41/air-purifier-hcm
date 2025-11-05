@@ -585,26 +585,6 @@ export default function AdminDashboardPage() {
                     animateScale: true,
                     duration: 2000,
                     easing: 'easeOutCubic' as any,
-                    onProgress: function(animation: any) {
-                      // Force animation from 0
-                      if (animation.currentStep === 0) {
-                        animation.chart.data.datasets.forEach((dataset: any, index: number) => {
-                          if (!dataset._meta) dataset._meta = {};
-                        });
-                      }
-                    },
-                  },
-                  animations: {
-                    scale: {
-                      from: 0,
-                      duration: 2000,
-                      easing: 'easeOutCubic' as any,
-                    },
-                    rotate: {
-                      from: 0,
-                      duration: 2000,
-                      easing: 'easeOutCubic' as any,
-                    },
                   },
                   plugins: {
                     legend: {
