@@ -138,16 +138,10 @@ export async function POST(request: NextRequest) {
  */
 function extractOrderCode(content: string): string | null {
   if (!content) return null;
-  // Ưu tiên format đầy đủ: HTX-<13 số>-<chuỗi A-Z0-9>
-  const patterns = [
-    /(HTX-\d{10,}-[A-Z0-9]+)/i,
-    /(HTX-\d{10,})/i,
-  ];
-  for (const p of patterns) {
-    const m = content.match(p);
-    if (m && m[1]) return m[1].toUpperCase();
-  }
-  return null;
+
+  // Tìm mã đơn dạng HTX-<digits>-<A-Z0-9>
+  const match = content.match(/HTX-\d+-[A-Z0-9]+/i);
+  return match ? match[0].toUpperCase() : null;
 }
 
 // Allow GET request để test webhook endpoint
