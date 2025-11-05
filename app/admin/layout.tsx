@@ -80,13 +80,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <div className="flex flex-col h-full">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-sky-400 to-blue-600 rounded-xl flex items-center justify-center">
-                  <Package className="w-6 h-6" />
-                </div>
-                {sidebarOpen && (
-                  <div>
-                    <h2 className="font-bold text-lg">Admin Panel</h2>
-                    <p className="text-xs text-slate-400">Hơi Thở Xanh</p>
+                {sidebarOpen ? (
+                  <div className="w-36 h-10 flex items-center justify-center">
+                    <img 
+                      src="/logo-hoi-tho-xanh.svg" 
+                      alt="Hơi Thở Xanh" 
+                      className="w-full h-full object-contain" 
+                    />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 flex items-center justify-center">
+                    <img 
+                      src="/logo-hoi-tho-xanh.svg" 
+                      alt="Hơi Thở Xanh" 
+                      className="w-full h-full object-contain" 
+                    />
                   </div>
                 )}
               </div>

@@ -12,6 +12,33 @@ import {
   CheckCircle
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+} from 'chart.js';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import CounterAnimation from "@/components/CounterAnimation";
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+);
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
@@ -27,10 +54,95 @@ export default function AdminDashboardPage() {
   const [unanswered, setUnanswered] = useState<any[]>([]);
   const [answered, setAnswered] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [chartData, setChartData] = useState<any>(null);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  const prepareChartData = (orders: any[]) => {
+    // Revenue chart (last 7 days)
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - i));
+      return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    });
+
+    const revenueByDay = last7Days.map(date => {
+      const dayOrders = orders.filter((o: any) => {
+        const orderDate = new Date(o.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        return orderDate === date && o.status === 'delivered';
+      });
+      return dayOrders.reduce((sum: number, o: any) => sum + parseFloat(o.final_amount || 0), 0);
+    });
+
+    // Orders chart (last 7 days)
+    const ordersByDay = last7Days.map(date => {
+      return orders.filter((o: any) => {
+        const orderDate = new Date(o.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        return orderDate === date;
+      }).length;
+    });
+
+    // Status distribution
+    const statusCounts = {
+      pending: orders.filter((o: any) => o.status === 'pending').length,
+      processing: orders.filter((o: any) => o.status === 'processing').length,
+      shipped: orders.filter((o: any) => o.status === 'shipped').length,
+      delivered: orders.filter((o: any) => o.status === 'delivered').length,
+      cancelled: orders.filter((o: any) => o.status === 'cancelled').length,
+    };
+
+    setChartData({
+      revenueChart: {
+        labels: last7Days,
+        datasets: [
+          {
+            label: 'Doanh thu (VNĐ)',
+            data: revenueByDay,
+            borderColor: 'rgb(34, 197, 94)',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+            tension: 0.4,
+            fill: true,
+          },
+        ],
+      },
+      ordersChart: {
+        labels: last7Days,
+        datasets: [
+          {
+            label: 'Số đơn hàng',
+            data: ordersByDay,
+            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+            borderRadius: 8,
+          },
+        ],
+      },
+      statusChart: {
+        labels: ['Chờ xử lý', 'Đang xử lý', 'Đang giao', 'Đã giao', 'Đã hủy'],
+        datasets: [
+          {
+            data: [
+              statusCounts.pending,
+              statusCounts.processing,
+              statusCounts.shipped,
+              statusCounts.delivered,
+              statusCounts.cancelled,
+            ],
+            backgroundColor: [
+              'rgba(234, 179, 8, 0.8)',
+              'rgba(59, 130, 246, 0.8)',
+              'rgba(168, 85, 247, 0.8)',
+              'rgba(34, 197, 94, 0.8)',
+              'rgba(239, 68, 68, 0.8)',
+            ],
+            borderWidth: 2,
+            borderColor: '#fff',
+          },
+        ],
+      },
+    });
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -83,6 +195,10 @@ export default function AdminDashboardPage() {
         content: q.content,
         time: new Date(q.answered_at).toLocaleDateString('vi-VN')
       })));
+
+      // Prepare chart data
+      prepareChartData(orders);
+      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -175,7 +291,13 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <p className="text-gray-600 text-sm font-medium">{stat.label}</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">{stat.value}</p>
+              <div className="text-2xl font-bold text-gray-900 mt-2">
+                {typeof stat.value === 'number' ? (
+                  <CounterAnimation value={stat.value} />
+                ) : (
+                  <CounterAnimation value={stat.value} />
+                )}
+              </div>
             </motion.div>
           );
         })}
@@ -244,7 +366,9 @@ export default function AdminDashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Đơn hàng chờ xử lý</p>
-                  <p className="text-xl font-bold text-gray-900">{stats.pendingOrders}</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    <CounterAnimation value={stats.pendingOrders} />
+                  </p>
                 </div>
               </div>
             </div>
@@ -256,7 +380,9 @@ export default function AdminDashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Đơn hàng đã hoàn thành</p>
-                  <p className="text-xl font-bold text-gray-900">{stats.completedOrders}</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    <CounterAnimation value={stats.completedOrders} />
+                  </p>
                 </div>
               </div>
             </div>
@@ -269,9 +395,13 @@ export default function AdminDashboardPage() {
                 <div>
                   <p className="text-sm text-gray-600">Tỷ lệ hoàn thành</p>
                   <p className="text-xl font-bold text-gray-900">
-                    {stats.totalOrders > 0 
-                      ? Math.round((stats.completedOrders / stats.totalOrders) * 100) 
-                      : 0}%
+                    {stats.totalOrders > 0 ? (
+                      <CounterAnimation 
+                        value={Math.round((stats.completedOrders / stats.totalOrders) * 100)} 
+                      />
+                    ) : (
+                      0
+                    )}%
                   </p>
                 </div>
               </div>
