@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,23 +30,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // DÙNG CHÍNH XÁC GIỐNG ADMIN PAGE - createClient() với ANON_KEY
-    // Admin page: createClient() -> createBrowserClient(NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)
-    // Check API: Tạo client với CHÍNH XÁC cùng URL và ANON_KEY (không dùng SERVICE_ROLE_KEY)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    // DÙNG SERVICE_ROLE_KEY để bypass RLS (API routes không có user session)
+    // Admin page: dùng ANON_KEY VÌ user đã đăng nhập
+    // Check API: dùng SERVICE_ROLE_KEY để bypass RLS vì không có user session
+    const supabase = createAdminClient();
     
-    const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
-    
-    console.log('🔌 Check API - Connected to Supabase (SAME AS ADMIN PAGE):', {
-      url: supabaseUrl?.substring(0, 30) + '...',
-      keyType: 'ANON_KEY (same as admin page)',
-    });
+    console.log('🔌 Check API - Using SERVICE_ROLE_KEY to bypass RLS (no user session in API route)');
 
     // QUERY GIỐNG HỆT ADMIN PAGE - Query tất cả orders rồi filter (như admin page)
     // Admin page: supabase.from("orders").select("*").order("created_at", { ascending: false })
