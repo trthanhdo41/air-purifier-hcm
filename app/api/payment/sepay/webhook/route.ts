@@ -334,6 +334,33 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Verify status cũng phải là 'processing'
+    if (verifyOrder.status !== 'processing') {
+      console.error('❌ CRITICAL: Order status not updated to processing!', {
+        order_id: order.id,
+        order_number: order.order_number,
+        expected: 'processing',
+        actual: verifyOrder.status,
+        updated_data_status: updatedOrder?.status,
+        verified_data: verifyOrder,
+      });
+      
+      // TRẢ VỀ ERROR để SEPay retry
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Order status not updated to processing',
+          details: {
+            expected: 'processing',
+            actual: verifyOrder.status,
+            updated_data: updatedOrder,
+            verified_data: verifyOrder,
+          }
+        },
+        { status: 500 }
+      );
+    }
     
     // CHỈ LOG KHI VERIFY THÀNH CÔNG
     console.log('✅ Update verified successfully:', {

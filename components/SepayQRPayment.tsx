@@ -56,29 +56,76 @@ export default function SepayQRPayment({
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  // Check payment status every 5 seconds
+  // Check payment status every 3 seconds (faster polling)
   useEffect(() => {
+    let isMounted = true;
+    let retryCount = 0;
+    const maxRetries = 200; // 200 * 3s = 10 phút max
+
     const checkPayment = async () => {
+      if (!isMounted) return;
+      
+      retryCount++;
+      if (retryCount > maxRetries) {
+        console.warn('⚠️ Payment check timeout after 10 minutes');
+        return;
+      }
+
       try {
         setCheckingPayment(true);
-        const res = await fetch(`/api/payment/sepay/check?orderCode=${orderCode}`);
+        // Add timestamp to prevent caching
+        const timestamp = Date.now();
+        const res = await fetch(`/api/payment/sepay/check?orderCode=${orderCode}&t=${timestamp}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+          },
+        });
+        
+        if (!res.ok) {
+          console.error('❌ Payment check failed:', res.status, res.statusText);
+          return;
+        }
+
         const data = await res.json();
         
-        console.log('💳 Payment check result:', data);
+        console.log('💳 Payment check result:', {
+          success: data.success,
+          isPaid: data.isPaid,
+          order: data.order ? { order_number: data.order.order_number, payment_status: data.order.payment_status } : null,
+          retryCount,
+        });
         
-        if (data.success && data.isPaid) {
-          console.log('✅ Payment confirmed! Redirecting...');
+        if (data.success && data.isPaid && data.order) {
+          console.log('✅ Payment confirmed! Redirecting...', {
+            order_number: data.order.order_number,
+            payment_status: data.order.payment_status,
+          });
+          // Stop polling
+          isMounted = false;
+          // Call onSuccess to redirect
           onSuccess?.();
         }
       } catch (error) {
         console.error('❌ Error checking payment:', error);
       } finally {
-        setCheckingPayment(false);
+        if (isMounted) {
+          setCheckingPayment(false);
+        }
       }
     };
 
-    const interval = setInterval(checkPayment, 5000);
-    return () => clearInterval(interval);
+    // Check immediately on mount
+    checkPayment();
+    
+    // Then check every 3 seconds
+    const interval = setInterval(checkPayment, 3000);
+    
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [orderCode, onSuccess]);
 
   const minutes = Math.floor(timeLeft / 60);
