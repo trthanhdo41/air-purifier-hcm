@@ -32,8 +32,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate order number
-    const orderNumber = `HTX-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    // Generate short numeric order code: HTX<5 digits> (e.g. HTX91845)
+    // Random 5-digit number to reduce collision in practice
+    const fiveDigits = (Math.floor(Math.random() * 90000) + 10000).toString();
+    const orderNumber = `HTX${fiveDigits}`;
 
     // Create order
     const { data: order, error: orderError } = await supabase

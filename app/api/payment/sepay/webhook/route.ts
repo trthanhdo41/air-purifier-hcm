@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // Extract order code từ nhiều nguồn có thể
     // Ưu tiên lấy từ field "code" (Sepay tự nhận diện)
     // Nếu không có thì extract từ "content" (nội dung chuyển khoản)
-    const rawOrderCode = 
+    const extracted =
       payload.code ||                          // Sepay tự nhận diện code thanh toán
       payload.order_code || 
       payload.orderCode ||
@@ -35,15 +35,17 @@ export async function POST(request: NextRequest) {
       extractOrderCode(payload.transferContent) ||
       extractOrderCode(payload.transaction_content);
 
-    if (!rawOrderCode) {
+    if (!extracted) {
       console.error('❌ Order code not found in payload. Full payload:', payload);
       // Trả về success: true để Sepay không retry, nhưng không cập nhật đơn
       return NextResponse.json({ success: true, message: 'Order code not found, ignored' });
     }
 
-    // Chuẩn hóa mã đơn về HTX-<digits>-<CODE>
-    const orderCode = normalizeOrderCode(rawOrderCode);
-    console.log('✅ Order code extracted:', { raw: rawOrderCode, normalized: orderCode });
+    // Chuẩn hóa mã đơn về HTX-<digits>-<CODE> nếu có thể
+    const orderCode = normalizeOrderCode(typeof extracted === 'string' ? extracted : extracted?.full || extracted?.short || '');
+    const prefixDigits = typeof extracted === 'string' ? null : (extracted?.prefixDigits ?? null);
+    const suffixToken = typeof extracted === 'string' ? null : (extracted?.suffixToken ?? null);
+    console.log('✅ Order code extracted:', { raw: extracted, normalized: orderCode, prefixDigits, suffixToken });
 
     // Chỉ xử lý giao dịch TIỀN VÀO
     if (payload.transferType && payload.transferType !== 'in') {
@@ -58,14 +60,14 @@ export async function POST(request: NextRequest) {
     // Thử tìm theo nhiều biến thể của mã đơn để tránh sai khác dấu gạch
     const variants = Array.from(new Set([
       orderCode,
-      orderCode.replace(/-/g, ''), // không dấu gạch
-      orderCode.replace(/-/g, '–'), // en dash
-      orderCode.replace(/-/g, '—'), // em dash
+      orderCode.replace(/-/g, ''),
+      orderCode.replace(/-/g, '–'),
+      orderCode.replace(/-/g, '—'),
     ]));
 
     let { data: order, error: findError } = await supabase
       .from('orders')
-      .select('id, order_number, total_amount, final_amount, payment_status')
+      .select('id, order_number, total_amount, final_amount, payment_status, created_at')
       .in('order_number', variants)
       .maybeSingle();
 
@@ -74,19 +76,43 @@ export async function POST(request: NextRequest) {
       const noDashVariant = orderCode.replace(/-/g, '');
       const retry = await supabase
         .from('orders')
-        .select('id, order_number, total_amount, final_amount, payment_status')
+        .select('id, order_number, total_amount, final_amount, payment_status, created_at')
         .in('order_number', [noDashVariant, noDashVariant.replace(/-/g, '–'), noDashVariant.replace(/-/g, '—')])
         .maybeSingle();
 
-      if (retry.error || !retry.data) {
-        console.error('❌ Order not found with both variants:', { orderCode, noDashVariant, error: findError || retry.error });
-        // Trả về success để không retry nhưng log kỹ
-        return NextResponse.json({ success: true, message: 'Order not found with any variant, ignored' });
+      if (!retry.error && retry.data) {
+        order = retry.data as any;
       }
-      order = retry.data as any;
+    }
+
+    // Fallback 1: Thử match theo hậu tố mã (suffixToken) nếu có trong content, ví dụ: HTX17623340 96471Z8GVK7EUO
+    if (!order && suffixToken) {
+      const { data: bySuffix, error: bySuffixErr } = await supabase
+        .from('orders')
+        .select('id, order_number, total_amount, final_amount, payment_status, created_at')
+        .ilike('order_number', `%-${suffixToken}`);
+      if (!bySuffixErr && bySuffix && bySuffix.length > 0) {
+        // Nếu nhiều kết quả, ưu tiên đơn mới nhất
+        bySuffix.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        order = bySuffix[0] as any;
+      }
+    }
+
+    // Fallback 2: Thử match theo tiền tố số (prefixDigits) nếu có, ví dụ: HTX17623340 -> match HTX-17623340%
+    if (!order && prefixDigits) {
+      const { data: byPrefix, error: byPrefixErr } = await supabase
+        .from('orders')
+        .select('id, order_number, total_amount, final_amount, payment_status, created_at')
+        .ilike('order_number', `HTX-${prefixDigits}%`);
+      if (!byPrefixErr && byPrefix && byPrefix.length > 0) {
+        // Ưu tiên đơn mới nhất
+        byPrefix.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        order = byPrefix[0] as any;
+      }
     }
 
     if (!order) {
+      console.error('❌ Order not found with any strategy:', { orderCode, prefixDigits, suffixToken });
       return NextResponse.json({ success: true, message: 'Order lookup resulted in null' });
     }
 
@@ -162,10 +188,17 @@ export async function POST(request: NextRequest) {
  * Content có thể có format: "NHAN TU 069704410592 TRACE 382348 ND TRAN THANH DO chuyen tien qua MoMo"
  * hoặc chứa order code ở đâu đó
  */
-function extractOrderCode(content: string): string | null {
+function extractOrderCode(content: string): any | null {
   if (!content) return null;
 
-  // 1) Chuẩn: HTX-<13digits>-<A-Z0-9>
+  // 1) Short: HTX<5-8 digits>
+  let s = content.toUpperCase();
+  let short = s.match(/HTX\s*-?\s*(\d{5,8})/i);
+  if (short) {
+    return { short: `HTX${short[1]}` };
+  }
+
+  // 2) Chuẩn cũ: HTX-<13digits>-<A-Z0-9>
   let m = content.match(/HTX-(\d{13})-([A-Z0-9]+)/i);
   if (m) return m[0].toUpperCase();
 
@@ -179,10 +212,21 @@ function extractOrderCode(content: string): string | null {
     return `HTX-${ts}-${code}`;
   }
 
-  // 3) Có thể có khoảng trắng hoặc dấu gạch lộn xộn
+  // 3) Có thể có khoảng trắng hoặc dấu gạch lộn xộn (13 chữ số)
   m = content.match(/HTX\s*-?\s*(\d{13})\s*-?\s*([A-Z0-9]{6,16})/i);
   if (m) {
     return `HTX-${m[1].toUpperCase()}-${m[2].toUpperCase()}`;
+  }
+
+  // 4) Trường hợp một số ngân hàng rút gọn timestamp còn 8-12 chữ số
+  // Ví dụ: "HTX17623340 96471Z8GVK7EUO" => không đủ 13 chữ số và có token riêng
+  const loose = content.match(/HTX\s*-?\s*(\d{8,12})\b[^A-Z0-9]*([A-Z0-9]{6,16})/i);
+  if (loose) {
+    return {
+      full: null,                 // không thể dựng đủ mã full vì thiếu chữ số
+      prefixDigits: loose[1],     // phần số ngay sau HTX
+      suffixToken: loose[2].toUpperCase(), // token chữ-số theo sau
+    };
   }
 
   return null;
@@ -203,14 +247,13 @@ export async function GET() {
 function normalizeOrderCode(input: string): string {
   if (!input) return input;
   const trimmed = input.trim().toUpperCase();
-  // Nếu đã đúng định dạng
-  const m1 = trimmed.match(/^HTX-\d+-[A-Z0-9]+$/);
-  if (m1) return trimmed;
-  // Nếu không dấu gạch: HTX<digits><CODE>
-  const m2 = trimmed.match(/^HTX(\d+)([A-Z0-9]+)$/);
-  if (m2) return `HTX-${m2[1]}-${m2[2]}`;
-  // Nếu có khoảng trắng hoặc dấu gạch lộn xộn
-  const m3 = trimmed.match(/^HTX\s*-?\s*(\d+)\s*-?\s*([A-Z0-9]+)$/);
-  if (m3) return `HTX-${m3[1]}-${m3[2]}`;
+  // Short preferred: HTX<5-8 digits>
+  const short1 = trimmed.match(/^HTX(\d{5,8})$/);
+  if (short1) return `HTX${short1[1]}`;
+  const short2 = trimmed.match(/^HTX\s*-?\s*(\d{5,8})$/);
+  if (short2) return `HTX${short2[1]}`;
+  // Legacy keep-as-is
+  const legacy = trimmed.match(/^HTX-(\d{13})-([A-Z0-9]+)$/);
+  if (legacy) return trimmed;
   return trimmed;
 }

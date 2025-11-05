@@ -83,14 +83,13 @@ export async function GET(request: NextRequest) {
 function normalizeOrderCode(input: string): string {
   if (!input) return input;
   const s = input.trim().toUpperCase();
-  // Nếu đã đúng định dạng HTX-<13digits>-<CODE>
-  const m1 = s.match(/^HTX-(\d{13})-([A-Z0-9]+)$/);
-  if (m1) return s;
-  // Không dấu gạch: HTX<13digits><CODE>
-  const m2 = s.match(/^HTX(\d{13})([A-Z0-9]+)$/);
-  if (m2) return `HTX-${m2[1]}-${m2[2]}`;
-  // Dấu/spacing lộn xộn
-  const m3 = s.match(/^HTX\s*-?\s*(\d{13})\s*-?\s*([A-Z0-9]+)$/);
-  if (m3) return `HTX-${m3[1]}-${m3[2]}`;
+  // Short code preferred: HTX<5-8 digits>, with or without dash/space
+  const short1 = s.match(/^HTX(\d{5,8})$/);
+  if (short1) return `HTX${short1[1]}`;
+  const short2 = s.match(/^HTX\s*-?\s*(\d{5,8})$/);
+  if (short2) return `HTX${short2[1]}`;
+  // Legacy formats: keep as-is to still allow lookups
+  const legacy1 = s.match(/^HTX-(\d{13})-([A-Z0-9]+)$/);
+  if (legacy1) return s;
   return s;
 }
