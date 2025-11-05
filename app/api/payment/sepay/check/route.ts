@@ -160,32 +160,61 @@ export async function GET(request: NextRequest) {
     }
 
     // Check nếu đã thanh toán
-    const isPaid = order.payment_status === 'paid';
+    // Nếu payment_status vẫn là 'pending', thử query lại với delay để đảm bảo đọc dữ liệu mới nhất
+    let isPaid = order.payment_status === 'paid';
+    let finalPaymentStatus = order.payment_status;
+    
+    // Nếu chưa paid, thử query lại với delay để đảm bảo đọc dữ liệu mới nhất (read consistency)
+    if (!isPaid && order.payment_status === 'pending') {
+      console.log('⏳ Check API - Payment status is pending, retrying with delay to ensure read consistency...');
+      await new Promise(resolve => setTimeout(resolve, 500)); // Delay 500ms
+      
+      // Query lại để lấy payment_status mới nhất
+      const { data: refreshOrder, error: refreshError } = await supabase
+        .from('orders')
+        .select('payment_status, status')
+        .eq('id', order.id)
+        .single();
+      
+      if (!refreshError && refreshOrder) {
+        finalPaymentStatus = refreshOrder.payment_status;
+        isPaid = finalPaymentStatus === 'paid';
+        console.log('🔄 Check API - Refreshed payment status:', {
+          order_id: order.id,
+          old_payment_status: order.payment_status,
+          new_payment_status: finalPaymentStatus,
+          isPaid,
+        });
+      }
+    }
 
     console.log('✅ Check API - Final result:', {
       rawCode,
       normalized,
       order_number: order.order_number,
-      payment_status: order.payment_status,
+      payment_status: finalPaymentStatus,
       status: order.status,
       isPaid,
       order_id: order.id,
     });
 
     // TRẢ VỀ ORDER NGAY CẢ KHI CHƯA PAID để FE có thể debug
+    // Update order object với payment_status mới nhất
+    const finalOrder = { ...order, payment_status: finalPaymentStatus };
+    
     return NextResponse.json(
       {
         success: true,
         isPaid,
-        order: order, // Trả về order ngay cả khi chưa paid
-        payment_status: order.payment_status, // Thêm payment_status riêng để dễ debug
+        order: finalOrder, // Trả về order với payment_status mới nhất
+        payment_status: finalPaymentStatus, // Thêm payment_status riêng để FE dễ check
         debug: {
           rawCode,
           normalized,
           variants,
           found: 1,
           matched: order.order_number,
-          payment_status: order.payment_status,
+          payment_status: finalPaymentStatus,
           status: order.status,
           order_id: order.id,
         },

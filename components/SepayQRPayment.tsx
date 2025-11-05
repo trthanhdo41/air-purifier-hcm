@@ -93,10 +93,15 @@ export default function SepayQRPayment({
 
         const data = await res.json();
         
+        const paymentStatus = data.payment_status || data.order?.payment_status || 'unknown';
+        const isPaidStatus = paymentStatus === 'paid';
+        
         console.log('💳 Payment check result:', {
           success: data.success,
           isPaid: data.isPaid,
-          payment_status: data.order?.payment_status || 'unknown',
+          payment_status: paymentStatus,
+          payment_status_from_response: data.payment_status,
+          payment_status_from_order: data.order?.payment_status,
           order: data.order ? { 
             order_number: data.order.order_number, 
             payment_status: data.order.payment_status,
@@ -105,11 +110,12 @@ export default function SepayQRPayment({
           retryCount,
         });
         
-        // Kiểm tra payment_status từ Supabase: nếu là 'paid' thì redirect
-        if (data.success && data.isPaid && data.order && data.order.payment_status === 'paid') {
+        // Kiểm tra payment_status TRỰC TIẾP từ Supabase: nếu là 'paid' thì redirect
+        // Không phụ thuộc vào isPaid flag, check trực tiếp payment_status
+        if (data.success && isPaidStatus && data.order) {
           console.log('✅ Payment confirmed! Redirecting...', {
             order_number: data.order.order_number,
-            payment_status: data.order.payment_status,
+            payment_status: paymentStatus,
             status: data.order.status,
           });
           // Stop polling
