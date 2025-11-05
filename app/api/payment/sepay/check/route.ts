@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,11 +30,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createAdminClient();
+    // DÙNG CHÍNH XÁC GIỐNG ADMIN PAGE - createClient() với ANON_KEY
+    // Admin page: createClient() -> createBrowserClient(NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    // Check API: Tạo client với CHÍNH XÁC cùng URL và ANON_KEY (không dùng SERVICE_ROLE_KEY)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     
-    // Log Supabase URL để confirm đang connect đúng project
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    console.log('🔌 Check API - Connected to Supabase:', supabaseUrl);
+    const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+    
+    console.log('🔌 Check API - Connected to Supabase (SAME AS ADMIN PAGE):', {
+      url: supabaseUrl?.substring(0, 30) + '...',
+      keyType: 'ANON_KEY (same as admin page)',
+    });
 
     // QUERY GIỐNG HỆT ADMIN PAGE - Query tất cả orders rồi filter (như admin page)
     // Admin page: supabase.from("orders").select("*").order("created_at", { ascending: false })
@@ -44,7 +56,6 @@ export async function GET(request: NextRequest) {
     console.log('🔍 Check API - Querying ALL orders (like admin page):', { 
       orderNumber,
       table: 'orders',
-      supabaseUrl: supabaseUrl?.substring(0, 30) + '...' // Chỉ log 30 ký tự đầu
     });
 
     // Query TẤT CẢ orders (giống hệt admin page)
