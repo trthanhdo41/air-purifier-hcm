@@ -243,8 +243,8 @@ export async function POST(request: NextRequest) {
     // Verify update was successful - DOUBLE CHECK
     console.log('🔍 Verifying update...', { order_id: order.id });
     
-    // Wait a bit to ensure DB write is complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Wait longer to ensure DB write is complete and replicated
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     const { data: verifyOrder, error: verifyError } = await supabase
       .from('orders')
