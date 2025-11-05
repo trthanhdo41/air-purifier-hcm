@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/stores/auth";
 import { motion } from "framer-motion";
-import { Send, Search, Package, Settings, MessageCircle, User, Clock, CheckCircle, Phone } from "lucide-react";
+import { Send, Search, Package, Settings, MessageCircle, User, Clock, CheckCircle, Phone, Trash2 } from "lucide-react";
 
 interface ChatMessage {
   id: string;
@@ -38,6 +38,7 @@ export default function CustomerServicePage() {
   const [selectedUserWarranty, setSelectedUserWarranty] = useState<any[]>([]);
   const [showOrders, setShowOrders] = useState(false);
   const [showWarranty, setShowWarranty] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -292,6 +293,52 @@ export default function CustomerServicePage() {
     cancelled: 'Đã hủy',
   };
 
+  const deleteChatHistory = async (userId: string | null) => {
+    if (!userId || !user) return;
+
+    if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử chat của khách hàng này? Hành động này không thể hoàn tác.')) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        alert('Vui lòng đăng nhập lại');
+        return;
+      }
+
+      const response = await fetch('/api/admin/chat/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Lỗi khi xóa lịch sử chat');
+      }
+
+      alert(result.message || 'Đã xóa lịch sử chat thành công');
+      
+      // Refresh messages and users list
+      setMessages([]);
+      setSelectedUserId(null);
+      await fetchUsers();
+    } catch (error: any) {
+      console.error('Error deleting chat history:', error);
+      alert(error.message || 'Lỗi khi xóa lịch sử chat');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm mb-6">
@@ -390,6 +437,7 @@ export default function CustomerServicePage() {
                         className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
+                        title="Xem đơn hàng"
                       >
                         <Package className="w-5 h-5 text-gray-600" />
                       </motion.button>
@@ -398,8 +446,23 @@ export default function CustomerServicePage() {
                         className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
+                        title="Xem bảo hành"
                       >
                         <Settings className="w-5 h-5 text-gray-600" />
+                      </motion.button>
+                      <motion.button
+                        onClick={() => deleteChatHistory(selectedUserId)}
+                        disabled={deleting}
+                        className="p-2 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        title="Xóa lịch sử chat"
+                      >
+                        {deleting ? (
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
+                        ) : (
+                          <Trash2 className="w-5 h-5 text-red-600" />
+                        )}
                       </motion.button>
                     </div>
                   </div>
