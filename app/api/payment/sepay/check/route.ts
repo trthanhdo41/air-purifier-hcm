@@ -32,22 +32,52 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // QUERY GIỐNG HỆT ADMIN PAGE - Đơn giản, trực tiếp bằng order_number chính xác
+    // QUERY GIỐNG HỆT ADMIN PAGE - Query tất cả orders rồi filter (như admin page)
     // Admin page: supabase.from("orders").select("*").order("created_at", { ascending: false })
-    // Check API: supabase.from("orders").select("*").eq("order_number", rawCode.trim())
+    // Check API: Query tất cả orders, sau đó filter theo order_number (giống admin page filter)
     const orderNumber = rawCode.trim();
     
-    console.log('🔍 Check API - Querying order (like admin page):', { orderNumber });
+    console.log('🔍 Check API - Querying ALL orders (like admin page):', { orderNumber });
 
-    // Query trực tiếp bằng order_number chính xác (giống admin page filter)
-    const { data: orders, error } = await supabase
+    // Query TẤT CẢ orders (giống hệt admin page)
+    const { data: allOrders, error } = await supabase
       .from('orders')
       .select('*')
-      .eq('order_number', orderNumber)
-      .order('created_at', { ascending: false })
-      .limit(1);
+      .order('created_at', { ascending: false });
 
-    const order = Array.isArray(orders) && orders.length > 0 ? orders[0] : null;
+    if (error) {
+      console.error('❌ Check API - Error querying orders:', error.message);
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+          debug: {
+            orderNumber,
+            error: error.message,
+          },
+        },
+        {
+          status: 500,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          },
+        }
+      );
+    }
+
+    console.log('🔍 Check API - Total orders found:', allOrders?.length || 0);
+
+    // Filter theo order_number (giống admin page filter)
+    const order = Array.isArray(allOrders) 
+      ? allOrders.find(o => 
+          o.order_number === orderNumber || 
+          o.order_number === orderNumber.trim() ||
+          o.order_number?.trim() === orderNumber ||
+          o.order_number?.toUpperCase() === orderNumber.toUpperCase()
+        )
+      : null;
 
     if (error) {
       console.error('❌ Check API - Error querying order:', error.message);
@@ -72,7 +102,19 @@ export async function GET(request: NextRequest) {
     }
 
     if (!order) {
-      console.error('❌ Check API - Order not found:', { orderNumber, found: orders?.length || 0 });
+      console.error('❌ Check API - Order not found:', { 
+        orderNumber, 
+        totalOrders: allOrders?.length || 0,
+        sampleOrderNumbers: allOrders?.slice(0, 5).map(o => o.order_number) || [],
+      });
+      
+      // Log tất cả order_numbers để debug
+      if (allOrders && allOrders.length > 0) {
+        console.log('📋 Check API - All order_numbers in DB:', 
+          allOrders.map(o => o.order_number).slice(0, 20)
+        );
+      }
+      
       return NextResponse.json(
         {
           success: true,
@@ -81,8 +123,10 @@ export async function GET(request: NextRequest) {
           payment_status: 'pending',
           debug: {
             orderNumber,
+            totalOrders: allOrders?.length || 0,
             found: 0,
             message: 'Order not found in Supabase',
+            sampleOrderNumbers: allOrders?.slice(0, 5).map(o => o.order_number) || [],
           },
         },
         {
