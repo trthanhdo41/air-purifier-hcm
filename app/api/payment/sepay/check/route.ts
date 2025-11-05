@@ -79,28 +79,6 @@ export async function GET(request: NextRequest) {
         )
       : null;
 
-    if (error) {
-      console.error('❌ Check API - Error querying order:', error.message);
-      return NextResponse.json(
-        {
-          success: false,
-          error: error.message,
-          debug: {
-            orderNumber,
-            error: error.message,
-          },
-        },
-        {
-          status: 500,
-          headers: {
-            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-          },
-        }
-      );
-    }
-
     if (!order) {
       console.error('❌ Check API - Order not found:', { 
         orderNumber, 
