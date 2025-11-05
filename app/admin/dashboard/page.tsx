@@ -436,7 +436,7 @@ export default function AdminDashboardPage() {
                     enabled: true,
                     mode: 'index',
                     intersect: false,
-                    position: 'average' as any,
+                    position: 'nearest' as any,
                     backgroundColor: 'rgba(0, 0, 0, 0.85)',
                     padding: 12,
                     titleFont: { size: 14, weight: 'bold' },
@@ -502,8 +502,8 @@ export default function AdminDashboardPage() {
                   tooltip: {
                     enabled: true,
                     mode: 'index',
-                    intersect: false,
-                    position: 'average' as any,
+                    intersect: true,
+                    position: 'nearest' as any,
                     backgroundColor: 'rgba(0, 0, 0, 0.85)',
                     padding: 12,
                     titleFont: { size: 14, weight: 'bold' },
@@ -552,11 +552,18 @@ export default function AdminDashboardPage() {
                   responsive: true,
                   maintainAspectRatio: false,
                   animation: {
+                    animateRotate: true,
+                    animateScale: true,
                     duration: 2000,
                     easing: 'easeOutCubic' as any,
                   },
                   animations: {
                     scale: {
+                      from: 0,
+                      duration: 2000,
+                      easing: 'easeOutCubic' as any,
+                    },
+                    rotate: {
                       from: 0,
                       duration: 2000,
                       easing: 'easeOutCubic' as any,
@@ -569,12 +576,12 @@ export default function AdminDashboardPage() {
                     },
                     tooltip: {
                       enabled: true,
-                      position: 'average' as any,
+                      position: 'nearest' as any,
                       backgroundColor: 'rgba(0, 0, 0, 0.85)',
                       padding: 12,
                       titleFont: { size: 14, weight: 'bold' },
                       bodyFont: { size: 13 },
-                      displayColors: false,
+                      displayColors: true,
                       callbacks: {
                         label: function(context: any) {
                           const label = context.label || '';
@@ -623,8 +630,8 @@ export default function AdminDashboardPage() {
                     tooltip: {
                       enabled: true,
                       mode: 'index',
-                      intersect: false,
-                      position: 'average' as any,
+                      intersect: true,
+                      position: 'nearest' as any,
                       backgroundColor: 'rgba(0, 0, 0, 0.85)',
                       padding: 12,
                       titleFont: { size: 14, weight: 'bold' },
