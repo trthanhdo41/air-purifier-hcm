@@ -60,7 +60,7 @@ export default function AdminDashboardPage() {
     fetchDashboardData();
   }, []);
 
-  const prepareChartData = (orders: any[]) => {
+  const prepareChartData = (orders: any[], orderItems: any[] = []) => {
     // Memoize để tránh re-render vô cực
     if (!orders || orders.length === 0) {
       setChartData(null);
@@ -97,6 +97,27 @@ export default function AdminDashboardPage() {
       delivered: orders.filter((o: any) => o.status === 'delivered').length,
       cancelled: orders.filter((o: any) => o.status === 'cancelled').length,
     };
+
+    // Top products (top 5 sản phẩm bán chạy)
+    const productSales: { [key: string]: { name: string; quantity: number } } = {};
+    orderItems.forEach((item: any) => {
+      if (item.product_id && item.products) {
+        const productId = item.product_id;
+        const productName = item.products.name || 'Sản phẩm không tên';
+        if (!productSales[productId]) {
+          productSales[productId] = { name: productName, quantity: 0 };
+        }
+        productSales[productId].quantity += item.quantity || 0;
+      }
+    });
+    
+    const topProducts = Object.entries(productSales)
+      .sort(([, a], [, b]) => b.quantity - a.quantity)
+      .slice(0, 5)
+      .map(([, data]) => data);
+    
+    const topProductNames = topProducts.map(p => p.name);
+    const topProductQuantities = topProducts.map(p => p.quantity);
 
     setChartData({
       revenueChart: {
@@ -143,6 +164,23 @@ export default function AdminDashboardPage() {
             ],
             borderWidth: 2,
             borderColor: '#fff',
+          },
+        ],
+      },
+      topProductsChart: {
+        labels: topProductNames.length > 0 ? topProductNames : ['Chưa có dữ liệu'],
+        datasets: [
+          {
+            label: 'Số lượng bán',
+            data: topProductQuantities.length > 0 ? topProductQuantities : [0],
+            backgroundColor: [
+              'rgba(34, 197, 94, 0.8)',
+              'rgba(59, 130, 246, 0.8)',
+              'rgba(168, 85, 247, 0.8)',
+              'rgba(234, 179, 8, 0.8)',
+              'rgba(239, 68, 68, 0.8)',
+            ],
+            borderRadius: 8,
           },
         ],
       },
@@ -204,7 +242,7 @@ export default function AdminDashboardPage() {
       // Prepare chart data (chỉ gọi 1 lần khi có data)
       // Chỉ prepare khi orders có data và chartData chưa có
       if (orders.length > 0 && !chartData) {
-        prepareChartData(orders);
+        prepareChartData(orders, orderItems || []);
       } else if (orders.length === 0) {
         setChartData(null);
       }
@@ -385,23 +423,19 @@ export default function AdminDashboardPage() {
             <div style={{ height: '250px', position: 'relative' }}>
               <Bar
                 data={chartData.ordersChart}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  animation: false, // Hoàn toàn disable animation
-                  transitions: {
-                    active: {
-                      animation: {
-                        duration: 0,
-                      },
-                    },
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                  duration: 1000, // Animation 1 giây khi vào trang
+                  easing: 'easeOutQuart',
+                },
+                plugins: {
+                  legend: {
+                    display: true,
+                    position: 'top' as const,
                   },
-                  plugins: {
-                    legend: {
-                      display: true,
-                      position: 'top' as const,
-                    },
-                  },
+                },
                   scales: {
                     y: {
                       beginAtZero: true,
@@ -435,13 +469,9 @@ export default function AdminDashboardPage() {
                   options={{
                     responsive: true,
                     maintainAspectRatio: false,
-                    animation: false, // Hoàn toàn disable animation
-                    transitions: {
-                      active: {
-                        animation: {
-                          duration: 0,
-                        },
-                      },
+                    animation: {
+                      duration: 1000, // Animation 1 giây khi vào trang
+                      easing: 'easeOutQuart',
                     },
                     plugins: {
                       legend: {
