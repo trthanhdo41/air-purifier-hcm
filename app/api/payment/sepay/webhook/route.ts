@@ -19,9 +19,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
  */
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
   try {
     const payload = await request.json();
     console.log('📩 Sepay Webhook received:', JSON.stringify(payload, null, 2));
+    console.log('📩 Webhook timestamp:', new Date().toISOString());
 
     // Extract order code từ nhiều nguồn có thể
     // Ưu tiên lấy từ field "code" (Sepay tự nhận diện)
@@ -66,18 +68,17 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Tìm order theo order_number
-    // Thử tìm theo nhiều biến thể của mã đơn để tránh sai khác dấu gạch
     // Đồng bộ logic với check API để đảm bảo matching chính xác
-    const rawInput = typeof extracted === 'string' ? extracted : extracted?.short || extracted?.full || '';
+    // Dùng extractedString làm rawCode (giống check API dùng rawCode)
+    const rawCode = extractedString;
+    const normalized = orderCode;
     const variants = Array.from(new Set([
-      orderCode,
-      extractedString.trim(),
-      extractedString.trim().replace(/\s+/g, ''),
-      rawInput.trim(),
-      rawInput.trim().replace(/\s+/g, ''),
-      orderCode.replace(/-/g, ''),
-      orderCode.replace(/-/g, '–'),
-      orderCode.replace(/-/g, '—'),
+      normalized,
+      rawCode.trim(),
+      rawCode.trim().replace(/\s+/g, ''),
+      normalized.replace(/-/g, ''),
+      normalized.replace(/-/g, '–'),
+      normalized.replace(/-/g, '—'),
     ]));
 
     console.log('🔍 Searching order with variants:', variants);
@@ -156,12 +157,10 @@ export async function POST(request: NextRequest) {
     console.log('✅ Order found:', { order_id: order.id, order_number: order.order_number, current_payment_status: order.payment_status });
 
     // Kiểm tra đơn hàng đã được thanh toán chưa (tránh duplicate)
+    // NHƯNG vẫn update để đảm bảo sync với SEPay
     if (order.payment_status === 'paid') {
-      console.log('✅ Order already paid:', orderCode);
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Order already processed' 
-      });
+      console.log('⚠️ Order already paid, but verifying update:', orderCode);
+      // Vẫn update để đảm bảo sync với transaction_id và updated_at
     }
 
     // Verify số tiền (optional, để đảm bảo chính xác)
@@ -181,30 +180,48 @@ export async function POST(request: NextRequest) {
       payload.trans_id ||
       `SEPAY-${Date.now()}`;
 
-    console.log('🔄 Updating order:', { order_id: order.id, order_number: order.order_number, from_status: order.payment_status, to_status: 'paid' });
+    console.log('🔄 Updating order:', { 
+      order_id: order.id, 
+      order_number: order.order_number, 
+      from_status: order.payment_status, 
+      to_status: 'paid',
+      transaction_id: transactionId,
+    });
 
-    const { error: updateError } = await supabase
+    // Force update payment_status - KHÔNG check payment_status hiện tại
+    const { data: updatedOrder, error: updateError } = await supabase
       .from('orders')
       .update({
         payment_status: 'paid',
-        status: 'processing', // Đơn hàng chuyển sang đang xử lý
+        status: 'processing',
         transaction_id: transactionId,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', order.id);
+      .eq('id', order.id)
+      .select('payment_status, status, transaction_id')
+      .single();
 
     if (updateError) {
       console.error('❌ Error updating order:', updateError);
+      console.error('❌ Update error details:', JSON.stringify(updateError, null, 2));
       return NextResponse.json(
         { success: false, error: 'Failed to update order', details: updateError.message },
         { status: 500 }
       );
     }
 
-    // Verify update was successful
+    if (!updatedOrder) {
+      console.error('❌ Update returned no data:', { order_id: order.id });
+      return NextResponse.json(
+        { success: false, error: 'Update returned no data' },
+        { status: 500 }
+      );
+    }
+
+    // Verify update was successful - DOUBLE CHECK
     const { data: verifyOrder, error: verifyError } = await supabase
       .from('orders')
-      .select('payment_status, status')
+      .select('payment_status, status, transaction_id')
       .eq('id', order.id)
       .single();
 
@@ -212,24 +229,52 @@ export async function POST(request: NextRequest) {
       orderCode,
       order_id: order.id,
       order_number: order.order_number,
-      transactionId: payload.transaction_id || payload.id,
+      transactionId: transactionId,
       amount: payload.amount || payload.transferAmount,
-      verified_status: verifyOrder?.payment_status,
+      updated_data: updatedOrder,
+      verified_data: verifyOrder,
       verify_error: verifyError?.message,
     });
+
+    // Nếu verify thất bại, log warning nhưng vẫn trả về success
+    if (verifyError || !verifyOrder || verifyOrder.payment_status !== 'paid') {
+      console.error('⚠️ WARNING: Update verification failed!', {
+        verifyError: verifyError?.message,
+        verifyOrder,
+        expected: 'paid',
+        actual: verifyOrder?.payment_status,
+      });
+    }
 
     // TODO: Gửi email xác nhận thanh toán cho khách hàng
     // await sendPaymentConfirmationEmail(order);
 
+    const duration = Date.now() - startTime;
+    console.log('✅ Webhook completed successfully:', {
+      orderCode,
+      order_id: order.id,
+      order_number: order.order_number,
+      duration_ms: duration,
+    });
+
     return NextResponse.json({ 
       success: true, 
-      message: 'Payment processed successfully' 
+      message: 'Payment processed successfully',
+      orderCode,
+      order_id: order.id,
+      order_number: order.order_number,
     });
 
   } catch (error: any) {
+    const duration = Date.now() - startTime;
     console.error('❌ Webhook error:', error);
+    console.error('❌ Webhook error details:', {
+      message: error.message,
+      stack: error.stack,
+      duration_ms: duration,
+    });
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error.message, details: error.stack },
       { status: 500 }
     );
   }
