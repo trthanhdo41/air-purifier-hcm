@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MessageCircle, X, Send, Headphones, Bot, Package, Settings, ArrowLeft, ShoppingBag, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/lib/stores/auth";
@@ -12,6 +12,77 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 
 type ViewType = 'welcome' | 'orders' | 'warranty' | 'chat';
+
+// TypeWriter component for typing animation (optimized for smooth performance)
+function TypeWriter({ text, speed = 15, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(true);
+  const animationRef = useRef<number | null>(null);
+  const currentIndexRef = useRef(0);
+  const lastTimeRef = useRef(Date.now());
+  const textRef = useRef(text);
+
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
+
+  useEffect(() => {
+    if (!text) {
+      setDisplayedText('');
+      setIsTyping(false);
+      if (onComplete) onComplete();
+      return;
+    }
+
+    // Reset state
+    setDisplayedText('');
+    setIsTyping(true);
+    currentIndexRef.current = 0;
+    lastTimeRef.current = Date.now();
+
+    const animate = () => {
+      const now = Date.now();
+      const elapsed = now - lastTimeRef.current;
+      const currentText = textRef.current;
+
+      if (elapsed >= speed) {
+        if (currentIndexRef.current < currentText.length) {
+          // Batch multiple characters for longer text to maintain smoothness
+          const charsToAdd = Math.max(1, Math.floor(elapsed / speed));
+          const newIndex = Math.min(currentIndexRef.current + charsToAdd, currentText.length);
+          
+          // Use functional update to avoid stale closures
+          setDisplayedText(() => currentText.slice(0, newIndex));
+          currentIndexRef.current = newIndex;
+          lastTimeRef.current = now;
+          
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsTyping(false);
+          if (onComplete) onComplete();
+          return;
+        }
+      } else {
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current !== null) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [text, speed, onComplete]);
+
+  return (
+    <span>
+      {displayedText}
+      {isTyping && <span className="inline-block w-0.5 h-4 bg-gray-600 ml-0.5 animate-pulse">|</span>}
+    </span>
+  );
+}
 
 export default function Botchat() {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,6 +96,9 @@ export default function Botchat() {
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [aiResponding, setAiResponding] = useState(false);
+  const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
+  const shouldAutoScrollRef = useRef(true); // Track if we should auto scroll
+  const isUserScrollingRef = useRef(false); // Track if user is manually scrolling
   const { user } = useAuthStore();
   const router = useRouter();
 
@@ -157,13 +231,17 @@ export default function Botchat() {
       }
       
       setChatMessages(data || []);
-      // Auto scroll to bottom
-      setTimeout(() => {
-        const container = document.getElementById('chat-messages-container');
-        if (container) {
-          container.scrollTop = container.scrollHeight;
-        }
-      }, 100);
+      // Auto scroll to bottom (only if should auto scroll)
+      if (shouldAutoScrollRef.current) {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            const container = document.getElementById('chat-messages-container');
+            if (container && shouldAutoScrollRef.current) {
+              container.scrollTop = container.scrollHeight;
+            }
+          }, 50);
+        });
+      }
     } catch (err: any) {
       console.error('Error fetching messages:', err);
       if (err?.message?.includes('permission') || err?.message?.includes('users')) {
@@ -218,6 +296,17 @@ export default function Botchat() {
 
       // 2. Update chat messages list
       await fetchChatMessages();
+      
+      // Auto scroll to bottom after user sends message (only if should auto scroll)
+      shouldAutoScrollRef.current = true;
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const container = document.getElementById('chat-messages-container');
+          if (container && shouldAutoScrollRef.current) {
+            container.scrollTop = container.scrollHeight;
+          }
+        }, 50);
+      });
 
       // 3. Try to get AI response
       setAiResponding(true);
@@ -242,7 +331,7 @@ export default function Botchat() {
         if (aiData.success && aiData.message) {
           // AI responded successfully
           // Add AI response to chat_messages (as admin message so it shows up)
-          const { error: aiInsertError } = await supabase
+          const { data: aiMessageData, error: aiInsertError } = await supabase
             .from('chat_messages')
             .insert({
               user_id: user.id,
@@ -252,14 +341,52 @@ export default function Botchat() {
               is_from_user: false,
               is_read: false,
               admin_id: null, // AI response, not from admin
-            });
+            })
+            .select()
+            .single();
 
           if (aiInsertError) {
             console.error('Error saving AI response:', aiInsertError);
+          } else if (aiMessageData) {
+            // Set typing animation for this message
+            setTypingMessageId(aiMessageData.id);
+            shouldAutoScrollRef.current = true; // Enable auto scroll when AI starts responding
+            // Refresh chat messages to show the new message
+            await fetchChatMessages();
+            
+            // Auto scroll to bottom when AI responds (only if should auto scroll)
+            if (shouldAutoScrollRef.current) {
+              requestAnimationFrame(() => {
+                setTimeout(() => {
+                  const container = document.getElementById('chat-messages-container');
+                  if (container && shouldAutoScrollRef.current) {
+                    container.scrollTop = container.scrollHeight;
+                  }
+                }, 50);
+              });
+            }
+            
+            // Clear typing after animation completes (roughly text.length * speed + 500ms buffer)
+            // This will trigger markdown rendering after typing finishes
+            setTimeout(() => {
+              setTypingMessageId(null);
+              // Scroll again after markdown renders (only if should auto scroll)
+              if (shouldAutoScrollRef.current) {
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    const container = document.getElementById('chat-messages-container');
+                    if (container && shouldAutoScrollRef.current) {
+                      container.scrollTop = container.scrollHeight;
+                    }
+                  }, 50);
+                });
+              }
+              // Disable auto scroll after AI finishes responding
+              setTimeout(() => {
+                shouldAutoScrollRef.current = false;
+              }, 200);
+            }, aiData.message.length * 15 + 500);
           }
-
-          // Refresh chat messages
-          await fetchChatMessages();
         } else if (aiData.shouldWaitForAgent) {
           // AI is disabled or offline, wait for agent
           console.log('AI not available, waiting for agent');
@@ -269,6 +396,17 @@ export default function Botchat() {
         // Silently fail - user message is already saved, agent can respond manually
       } finally {
         setAiResponding(false);
+        // Auto scroll to bottom when AI finishes responding (only if should auto scroll)
+        if (shouldAutoScrollRef.current) {
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              const container = document.getElementById('chat-messages-container');
+              if (container && shouldAutoScrollRef.current) {
+                container.scrollTop = container.scrollHeight;
+              }
+            }, 50);
+          });
+        }
       }
     } catch (err: any) {
       console.error('Error sending message:', err);
@@ -470,7 +608,25 @@ export default function Botchat() {
                     </motion.button>
                     <h4 className="font-semibold text-gray-900">Chat với admin</h4>
                   </div>
-                  <div className="space-y-2 flex-1 overflow-y-auto" id="chat-messages-container">
+                  <div 
+                    className="space-y-2 flex-1 overflow-y-auto" 
+                    id="chat-messages-container"
+                    onScroll={(e) => {
+                      // Detect if user is manually scrolling up
+                      const container = e.currentTarget;
+                      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+                      
+                      if (!isAtBottom) {
+                        // User scrolled up, disable auto scroll
+                        shouldAutoScrollRef.current = false;
+                        isUserScrollingRef.current = true;
+                      } else {
+                        // User scrolled back to bottom, re-enable auto scroll
+                        shouldAutoScrollRef.current = true;
+                        isUserScrollingRef.current = false;
+                      }
+                    }}
+                  >
                     {chatMessages.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         <MessageCircle className="w-12 h-12 mx-auto mb-2 text-gray-300" />
@@ -493,24 +649,52 @@ export default function Botchat() {
                               // User message - plain text
                               <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
                             ) : (
-                              // AI/Admin message - render markdown
+                              // AI/Admin message - render markdown with typing animation
                               <div className="text-sm prose prose-sm max-w-none break-words">
-                                <ReactMarkdown
-                                  remarkPlugins={[remarkGfm]}
-                                  rehypePlugins={[rehypeRaw, rehypeSanitize]}
-                                  components={{
-                                    p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
-                                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                                    em: ({ children }) => <em className="italic">{children}</em>,
-                                    ul: ({ children }) => <ul className="list-disc list-inside mb-1 space-y-0.5">{children}</ul>,
-                                    ol: ({ children }) => <ol className="list-decimal list-inside mb-1 space-y-0.5">{children}</ol>,
-                                    li: ({ children }) => <li className="ml-2">{children}</li>,
-                                    code: ({ children }) => <code className="bg-gray-300 px-1 rounded text-xs">{children}</code>,
-                                    blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-400 pl-2 italic">{children}</blockquote>,
-                                  }}
-                                >
-                                  {msg.message}
-                                </ReactMarkdown>
+                                {typingMessageId === msg.id ? (
+                                  // Show typing animation for new AI message (raw text first, then render markdown)
+                                  <div className="whitespace-pre-wrap">
+                                    <TypeWriter 
+                                      text={msg.message} 
+                                      speed={15}
+                                      onComplete={() => {
+                                        // After typing completes, switch to markdown rendering
+                                        setTimeout(() => {
+                                          setTypingMessageId(null);
+                                          // Scroll to bottom after markdown renders (only if should auto scroll)
+                                          if (shouldAutoScrollRef.current) {
+                                            setTimeout(() => {
+                                              requestAnimationFrame(() => {
+                                                const container = document.getElementById('chat-messages-container');
+                                                if (container && shouldAutoScrollRef.current) {
+                                                  container.scrollTop = container.scrollHeight;
+                                                }
+                                              });
+                                            }, 100);
+                                          }
+                                        }, 100);
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  // Show full message with markdown after typing animation
+                                  <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                                    components={{
+                                      p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+                                      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                                      em: ({ children }) => <em className="italic">{children}</em>,
+                                      ul: ({ children }) => <ul className="list-disc list-inside mb-1 space-y-0.5">{children}</ul>,
+                                      ol: ({ children }) => <ol className="list-decimal list-inside mb-1 space-y-0.5">{children}</ol>,
+                                      li: ({ children }) => <li className="ml-2">{children}</li>,
+                                      code: ({ children }) => <code className="bg-gray-300 px-1 rounded text-xs">{children}</code>,
+                                      blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-400 pl-2 italic">{children}</blockquote>,
+                                    }}
+                                  >
+                                    {msg.message}
+                                  </ReactMarkdown>
+                                )}
                               </div>
                             )}
                             <p className={`text-xs mt-1 ${msg.is_from_user ? 'text-sky-100' : 'text-gray-500'}`}>
@@ -524,12 +708,12 @@ export default function Botchat() {
                       <div className="flex justify-start">
                         <div className="max-w-[80%] rounded-lg rounded-tl-none bg-gray-200 text-gray-900 p-3">
                           <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-700">Đang gõ</span>
                             <div className="flex gap-1">
-                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                              <div className="w-1.5 h-1.5 bg-gray-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                              <div className="w-1.5 h-1.5 bg-gray-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                              <div className="w-1.5 h-1.5 bg-gray-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                             </div>
-                            <span className="text-xs text-gray-500">Đang gõ...</span>
                           </div>
                         </div>
                       </div>
