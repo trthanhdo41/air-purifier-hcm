@@ -50,6 +50,8 @@ export default function ProductDetailPage() {
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [zoomPosition, setZoomPosition] = useState<{ x: number; y: number } | null>(null);
   const [showZoom, setShowZoom] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isBuying, setIsBuying] = useState(false);
   
   const { addItem, updateQuantity, setBuyNowItems } = useCartStore();
 
@@ -119,24 +121,31 @@ export default function ProductDetailPage() {
   const originalPriceValue = product?.original_price || product?.originalPrice;
   const hasDiscount = discountPercent > 0 || (originalPriceValue && originalPriceValue > (product?.price || 0));
 
-  const handleAddToCart = () => {
-    if (product) {
-      for (let i = 0; i < quantity; i++) {
-        addItem(product);
+  const handleAddToCart = async () => {
+    if (product && !isAddingToCart) {
+      try {
+        setIsAddingToCart(true);
+        for (let i = 0; i < quantity; i++) {
+          addItem(product);
+        }
+        await new Promise(resolve => setTimeout(resolve, 300)); // Thêm delay nhỏ để UX tốt hơn
+        setToastMessage(`Đã thêm ${quantity} sản phẩm "${product.name}" vào giỏ hàng`);
+        setShowToast(true);
+      } finally {
+        setIsAddingToCart(false);
       }
-      setToastMessage(`Đã thêm ${quantity} sản phẩm "${product.name}" vào giỏ hàng`);
-      setShowToast(true);
     }
   };
 
   const handleBuyNow = async () => {
-    if (product && product.stock > 0) {
+    if (product && product.stock > 0 && !isBuying) {
       try {
+        setIsBuying(true);
         // Set buyNowItems với chỉ sản phẩm hiện tại (không ảnh hưởng đến giỏ hàng cũ)
         setBuyNowItems([{ product, quantity }]);
         
         // Đợi một chút để đảm bảo state đã được cập nhật
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Chuyển đến trang thanh toán
         router.push('/checkout');
@@ -144,8 +153,9 @@ export default function ProductDetailPage() {
         console.error('Error setting buy now items:', e);
         setToastMessage('Có lỗi xảy ra khi xử lý đơn hàng');
         setShowToast(true);
+        setIsBuying(false);
       }
-    } else {
+    } else if (product && product.stock === 0) {
       setToastMessage('Sản phẩm hiện không có sẵn');
       setShowToast(true);
     }
@@ -494,18 +504,34 @@ export default function ProductDetailPage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button
                   onClick={handleBuyNow}
-                  disabled={product.stock === 0}
+                  disabled={product.stock === 0 || isBuying}
                   className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-700 text-white h-14 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-2xl transition-all duration-200"
                 >
-                  Mua ngay
+                  {isBuying ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    'Mua ngay'
+                  )}
                 </Button>
                 <Button
                   onClick={handleAddToCart}
-                  disabled={product.stock === 0}
+                  disabled={product.stock === 0 || isAddingToCart}
                   className="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white h-14 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-2xl transition-all duration-200"
                 >
-                  <ShoppingCart className="w-5 h-5 mr-2" />
-                  Thêm vào giỏ hàng
+                  {isAddingToCart ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Đang thêm...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="w-5 h-5 mr-2" />
+                      Thêm vào giỏ hàng
+                    </>
+                  )}
                 </Button>
               </div>
               <Button
