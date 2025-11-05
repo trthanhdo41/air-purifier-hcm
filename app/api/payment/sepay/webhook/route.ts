@@ -240,11 +240,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+
     // Verify update was successful - DOUBLE CHECK
     console.log('🔍 Verifying update...', { order_id: order.id });
-    
+
     // Wait longer to ensure DB write is complete and replicated
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 800));
     
     const { data: verifyOrder, error: verifyError } = await supabase
       .from('orders')
@@ -252,7 +253,7 @@ export async function POST(request: NextRequest) {
       .eq('id', order.id)
       .single();
 
-    console.log('✅ Order updated successfully:', {
+    console.log('🔍 Verification result:', {
       orderCode,
       order_id: order.id,
       order_number: order.order_number,
@@ -261,26 +262,71 @@ export async function POST(request: NextRequest) {
       updated_data: updatedOrder,
       verified_data: verifyOrder,
       verify_error: verifyError?.message,
+      verify_payment_status: verifyOrder?.payment_status,
+      verify_status: verifyOrder?.status,
     });
 
     // Nếu verify thất bại, LOG ERROR và TRẢ VỀ ERROR
-    if (verifyError || !verifyOrder || verifyOrder.payment_status !== 'paid') {
-      console.error('❌ CRITICAL: Update verification failed!', {
+    if (verifyError) {
+      console.error('❌ CRITICAL: Verification query failed!', {
         verifyError: verifyError?.message,
-        verifyOrder,
-        expected: 'paid',
-        actual: verifyOrder?.payment_status,
-        updated_data_payment_status: updatedOrder?.payment_status,
+        verifyErrorDetails: JSON.stringify(verifyError, null, 2),
+        order_id: order.id,
+        updated_data: updatedOrder,
       });
       
       // TRẢ VỀ ERROR để SEPay retry
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Update verification failed',
+          error: 'Verification query failed',
+          details: {
+            verifyError: verifyError.message,
+            updated_data: updatedOrder,
+          }
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!verifyOrder) {
+      console.error('❌ CRITICAL: Verification returned no data!', {
+        order_id: order.id,
+        updated_data: updatedOrder,
+      });
+      
+      // TRẢ VỀ ERROR để SEPay retry
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Verification returned no data',
+          details: {
+            order_id: order.id,
+            updated_data: updatedOrder,
+          }
+        },
+        { status: 500 }
+      );
+    }
+
+    if (verifyOrder.payment_status !== 'paid') {
+      console.error('❌ CRITICAL: Payment status not updated to paid!', {
+        order_id: order.id,
+        order_number: order.order_number,
+        expected: 'paid',
+        actual: verifyOrder.payment_status,
+        updated_data_payment_status: updatedOrder?.payment_status,
+        verified_data: verifyOrder,
+      });
+      
+      // TRẢ VỀ ERROR để SEPay retry
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Payment status not updated to paid',
           details: {
             expected: 'paid',
-            actual: verifyOrder?.payment_status,
+            actual: verifyOrder.payment_status,
             updated_data: updatedOrder,
             verified_data: verifyOrder,
           }
@@ -289,10 +335,13 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // CHỈ LOG KHI VERIFY THÀNH CÔNG
     console.log('✅ Update verified successfully:', {
       order_id: order.id,
+      order_number: order.order_number,
       payment_status: verifyOrder.payment_status,
       status: verifyOrder.status,
+      transaction_id: verifyOrder.transaction_id,
     });
 
     // TODO: Gửi email xác nhận thanh toán cho khách hàng
@@ -303,6 +352,8 @@ export async function POST(request: NextRequest) {
       orderCode,
       order_id: order.id,
       order_number: order.order_number,
+      payment_status: verifyOrder.payment_status,
+      status: verifyOrder.status,
       duration_ms: duration,
     });
 
@@ -312,6 +363,7 @@ export async function POST(request: NextRequest) {
       orderCode,
       order_id: order.id,
       order_number: order.order_number,
+      payment_status: verifyOrder.payment_status,
     });
 
   } catch (error: any) {
