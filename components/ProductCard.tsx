@@ -22,6 +22,7 @@ export default function ProductCard({ product, index, compact = false }: Product
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
   const { addItem } = useCartStore();
   const discountPercent = product.discount || 0;
   const originalPriceValue = (product as any).originalPrice ?? (product as any).original_price;
@@ -40,10 +41,18 @@ export default function ProductCard({ product, index, compact = false }: Product
     }
   }, [product.id]);
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    addItem(product);
-    setShowToast(true);
+    if (!isAddingToCart) {
+      try {
+        setIsAddingToCart(true);
+        addItem(product);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        setShowToast(true);
+      } finally {
+        setIsAddingToCart(false);
+      }
+    }
   };
 
   const handleWishlist = (e: React.MouseEvent) => {

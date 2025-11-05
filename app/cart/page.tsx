@@ -34,6 +34,7 @@ export default function CartPage() {
   const [isClient, setIsClient] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
+  const [isNavigatingToCheckout, setIsNavigatingToCheckout] = useState(false);
 
   const totalItems = getTotalItems();
   const totalPrice = getTotalPrice();
@@ -304,18 +305,30 @@ export default function CartPage() {
                 {/* Checkout Button */}
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
-                    onClick={() => {
+                    onClick={async () => {
                       if (!user) {
                         setShowMessage(true);
                         setLoginModalOpen(true);
                       } else {
+                        setIsNavigatingToCheckout(true);
+                        await new Promise(resolve => setTimeout(resolve, 200));
                         router.push("/checkout");
                       }
                     }}
-                    className="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white h-11 sm:h-12 text-sm sm:text-base font-semibold shadow-lg hover:shadow-xl transition-all"
+                    disabled={isNavigatingToCheckout}
+                    className="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white h-11 sm:h-12 text-sm sm:text-base font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <span>Tiến hành thanh toán</span>
-                    <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
+                    {isNavigatingToCheckout ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        <span>Đang chuyển...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Tiến hành thanh toán</span>
+                        <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
+                      </>
+                    )}
                   </Button>
                 </motion.div>
 
