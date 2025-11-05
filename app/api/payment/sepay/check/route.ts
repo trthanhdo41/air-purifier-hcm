@@ -76,10 +76,36 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('🔍 Check API - Total orders found:', allOrders?.length || 0);
-    console.log('🔍 Check API - Looking for orderNumber:', orderNumber);
+    console.log('🔍 Check API - Looking for orderNumber:', {
+      raw: rawCode,
+      trimmed: orderNumber,
+      length: orderNumber.length,
+      type: typeof orderNumber,
+    });
     console.log('🔍 Check API - First 10 order_numbers in DB:', 
-      allOrders?.slice(0, 10).map(o => o.order_number) || []
+      allOrders?.slice(0, 10).map(o => ({
+        order_number: o.order_number,
+        length: o.order_number?.length,
+        match_exact: o.order_number === orderNumber,
+        match_trim: o.order_number?.trim() === orderNumber,
+        match_upper: o.order_number?.toUpperCase() === orderNumber.toUpperCase(),
+      })) || []
     );
+    
+    // Test direct query by order_number
+    console.log('🔍 Check API - Testing DIRECT query by order_number...');
+    const { data: directQuery, error: directError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('order_number', orderNumber)
+      .maybeSingle();
+    
+    console.log('🔍 Check API - Direct query result:', {
+      found: directQuery ? 'YES' : 'NO',
+      error: directError?.message,
+      order_number: directQuery?.order_number,
+      payment_status: directQuery?.payment_status,
+    });
 
     // Filter theo order_number (giống admin page filter)
     const order = Array.isArray(allOrders) 
