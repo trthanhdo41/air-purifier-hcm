@@ -14,9 +14,8 @@ export default function CounterAnimation({ value, duration = 1.5, className = ""
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
-    // Nếu value là string (đã format), không animate
+    // Nếu value là string (đã format), không animate - render trực tiếp
     if (typeof value === 'string') {
-      setDisplayValue(0);
       return;
     }
 
@@ -47,7 +46,7 @@ export default function CounterAnimation({ value, duration = 1.5, className = ""
     requestAnimationFrame(animate);
   }, [value, duration]);
 
-  // Nếu value là string, render trực tiếp
+  // Nếu value là string, render trực tiếp (không animate)
   if (typeof value === 'string') {
     return <span className={className}>{value}</span>;
   }

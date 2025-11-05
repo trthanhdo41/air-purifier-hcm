@@ -303,6 +303,119 @@ export default function AdminDashboardPage() {
         })}
       </div>
 
+      {/* Charts Section */}
+      {chartData && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+          >
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Doanh thu 7 ngày qua</h2>
+            <Line
+              data={chartData.revenueChart}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    display: true,
+                    position: 'top' as const,
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context: any) {
+                        return `Doanh thu: ${new Intl.NumberFormat('vi-VN').format(context.parsed.y)}đ`;
+                      },
+                    },
+                  },
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: {
+                      callback: function(value: any) {
+                        return new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(value);
+                      },
+                    },
+                  },
+                },
+              }}
+              height={250}
+            />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+          >
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Đơn hàng 7 ngày qua</h2>
+            <Bar
+              data={chartData.ordersChart}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    display: true,
+                    position: 'top' as const,
+                  },
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: {
+                      stepSize: 1,
+                    },
+                  },
+                },
+              }}
+              height={250}
+            />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2"
+          >
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Phân bố trạng thái đơn hàng</h2>
+            <div className="flex items-center justify-center">
+              <div className="w-full max-w-md">
+                <Doughnut
+                  data={chartData.statusChart}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                      legend: {
+                        display: true,
+                        position: 'right' as const,
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: function(context: any) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return `${label}: ${value} (${percentage}%)`;
+                          },
+                        },
+                      },
+                    },
+                  }}
+                />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
