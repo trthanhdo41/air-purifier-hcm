@@ -68,6 +68,10 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('🔍 Check API - Total orders found:', allOrders?.length || 0);
+    console.log('🔍 Check API - Looking for orderNumber:', orderNumber);
+    console.log('🔍 Check API - First 10 order_numbers in DB:', 
+      allOrders?.slice(0, 10).map(o => o.order_number) || []
+    );
 
     // Filter theo order_number (giống admin page filter)
     const order = Array.isArray(allOrders) 
@@ -78,6 +82,15 @@ export async function GET(request: NextRequest) {
           o.order_number?.toUpperCase() === orderNumber.toUpperCase()
         )
       : null;
+    
+    console.log('🔍 Check API - Order found?', order ? 'YES' : 'NO');
+    if (order) {
+      console.log('🔍 Check API - Found order:', {
+        order_number: order.order_number,
+        payment_status: order.payment_status,
+        status: order.status,
+      });
+    }
 
     if (!order) {
       console.error('❌ Check API - Order not found:', { 
