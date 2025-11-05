@@ -61,16 +61,30 @@ export async function GET(request: NextRequest) {
         .limit(1);
       const fuzzy = Array.isArray(fuzzyOrders) && fuzzyOrders.length > 0 ? fuzzyOrders[0] : null;
       if (!fuzzy || fuzzyErr) {
-        return NextResponse.json({
-          success: true,
-          isPaid: false,
-        });
+        return NextResponse.json(
+          {
+            success: true,
+            isPaid: false,
+          },
+          {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+            },
+          }
+        );
       }
-      return NextResponse.json({
-        success: true,
-        isPaid: fuzzy.payment_status === 'paid',
-        order: fuzzy.payment_status === 'paid' ? fuzzy : null,
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          isPaid: fuzzy.payment_status === 'paid',
+          order: fuzzy.payment_status === 'paid' ? fuzzy : null,
+        },
+        {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          },
+        }
+      );
     }
 
     // Check nếu đã thanh toán
@@ -83,11 +97,18 @@ export async function GET(request: NextRequest) {
       isPaid,
     });
 
-    return NextResponse.json({
-      success: true,
-      isPaid,
-      order: isPaid ? order : null,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        isPaid,
+        order: isPaid ? order : null,
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        },
+      }
+    );
 
   } catch (error: any) {
     console.error('❌ Error checking payment status:', error);
