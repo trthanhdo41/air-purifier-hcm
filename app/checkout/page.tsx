@@ -17,7 +17,6 @@ import LoginModal from "@/components/LoginModal";
 import AddressSelector from "@/components/AddressSelector";
 import { useProvinces } from "@/lib/hooks/useProvinces";
 import PaymentProcessing from "@/components/PaymentProcessing";
-import SepayQRPayment from "@/components/SepayQRPayment";
 
 export default function CheckoutPage() {
   const { items, buyNowItems, getTotalItems, getTotalPrice, getTotalSavings, clearBuyNowItems } = useCartStore();
@@ -27,8 +26,6 @@ export default function CheckoutPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [showSepayQR, setShowSepayQR] = useState(false);
-  const [sepayQRData, setSepayQRData] = useState<any>(null);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -635,29 +632,6 @@ export default function CheckoutPage() {
       
       {/* Login Modal */}
       <LoginModal isOpen={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
-      
-      {/* Payment Processing Modal */}
-      {/* Sepay QR Payment Modal */}
-      {showSepayQR && sepayQRData && (
-        <SepayQRPayment
-          orderCode={sepayQRData.orderCode}
-          amount={sepayQRData.amount}
-          bankAccount={sepayQRData.bankAccount}
-          bankName={sepayQRData.bankName}
-          onSuccess={() => {
-            setShowSepayQR(false);
-            // Clear cart after successful payment
-            if (buyNowItems.length > 0) {
-              clearBuyNowItems();
-            }
-            router.push(`/success?order=${sepayQRData.orderCode}`);
-          }}
-          onCancel={() => {
-            setShowSepayQR(false);
-            setSepayQRData(null);
-          }}
-        />
-      )}
     </div>
   );
 }
