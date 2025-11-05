@@ -64,9 +64,21 @@ export default function SepayQRPayment({
       setCheckingPayment(true);
       setPaymentMessage('');
       
+      // LOG RÕ RÀNG ORDERCODE ĐANG GỬI
+      console.log('🔍 FE - Checking payment for orderCode:', orderCode);
+      console.log('🔍 FE - OrderCode details:', {
+        raw: orderCode,
+        trimmed: orderCode.trim(),
+        length: orderCode.length,
+        uppercase: orderCode.toUpperCase(),
+      });
+      
       const timestamp = Date.now();
+      const apiUrl = `/api/payment/sepay/check?orderCode=${orderCode}&t=${timestamp}`;
+      console.log('🔍 FE - Calling API:', apiUrl);
+      
       // Gọi API check để lấy payment_status từ Supabase (giống admin page)
-      const res = await fetch(`/api/payment/sepay/check?orderCode=${orderCode}&t=${timestamp}`, {
+      const res = await fetch(apiUrl, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
