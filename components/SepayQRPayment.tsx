@@ -93,35 +93,42 @@ export default function SepayQRPayment({
 
         const data = await res.json();
         
-        const paymentStatus = data.payment_status || data.order?.payment_status || 'unknown';
-        const isPaidStatus = paymentStatus === 'paid';
+        // CHECK GIỐNG HỆT ADMIN PAGE - Check trực tiếp payment_status === 'paid'
+        // Admin page: order.payment_status === 'paid' ? 'Đã thanh toán' : 'Chờ thanh toán'
+        // Checkout FE: payment_status === 'paid' ? redirect : continue polling
+        const paymentStatus = data.payment_status || data.order?.payment_status;
+        const isPaid = paymentStatus === 'paid';
         
-        console.log('💳 Payment check result:', {
+        console.log('💳 Payment check result (like admin page):', {
           success: data.success,
-          isPaid: data.isPaid,
           payment_status: paymentStatus,
           payment_status_from_response: data.payment_status,
           payment_status_from_order: data.order?.payment_status,
+          isPaid: isPaid,
           order: data.order ? { 
             order_number: data.order.order_number, 
             payment_status: data.order.payment_status,
             status: data.order.status,
+            id: data.order.id,
           } : null,
           retryCount,
         });
         
-        // Kiểm tra payment_status TRỰC TIẾP từ Supabase: nếu là 'paid' thì redirect
-        // Không phụ thuộc vào isPaid flag, check trực tiếp payment_status
-        if (data.success && isPaidStatus && data.order) {
+        // CHECK GIỐNG HỆT ADMIN PAGE - Nếu payment_status === 'paid' thì redirect
+        // Admin page check: order.payment_status === 'paid' → hiển thị "Đã thanh toán"
+        // Checkout FE check: payment_status === 'paid' → redirect đến /success
+        if (data.success && isPaid && paymentStatus === 'paid') {
           console.log('✅ Payment confirmed! Redirecting...', {
-            order_number: data.order.order_number,
+            order_number: data.order?.order_number,
             payment_status: paymentStatus,
-            status: data.order.status,
+            status: data.order?.status,
+            order_id: data.order?.id,
           });
           // Stop polling
           isMounted = false;
           // Call onSuccess to redirect
           onSuccess?.();
+          return; // Stop execution
         }
       } catch (error) {
         console.error('❌ Error checking payment:', error);
