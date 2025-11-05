@@ -349,7 +349,7 @@ export default function PaymentPage({ params }: PaymentPageProps) {
                 <div className="flex items-start gap-2 text-xs text-amber-600 bg-amber-50 p-4 rounded-lg">
                   <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                   <p>
-                    <strong>Lưu ý:</strong> Vui lòng nhập <strong>chính xác nội dung chuyển khoản "{orderCode}"</strong> để đơn hàng được xử lý tự động.
+                    <strong>Lưu ý:</strong> Vui lòng nhập <strong>chính xác nội dung chuyển khoản &quot;{orderCode}&quot;</strong> để đơn hàng được xử lý tự động.
                   </p>
                 </div>
               </div>
@@ -376,7 +376,7 @@ export default function PaymentPage({ params }: PaymentPageProps) {
                 </li>
                 <li className="flex gap-3">
                   <span className="font-bold text-lg">4.</span>
-                  <span>Sau khi chuyển khoản, click nút <strong className="text-green-600">"Đã thanh toán"</strong> để kiểm tra</span>
+                  <span>Sau khi chuyển khoản, click nút <strong className="text-green-600">&quot;Đã thanh toán&quot;</strong> để kiểm tra</span>
                 </li>
               </ol>
             </div>
