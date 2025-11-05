@@ -83,7 +83,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 {sidebarOpen ? (
                   <div className="w-36 h-10 flex items-center justify-center">
                     <img 
-                      src="/logo-hoi-tho-xanh.svg" 
+                      src="/font/hoi-tho-xanh-white.svg" 
                       alt="Hơi Thở Xanh" 
                       className="w-full h-full object-contain" 
                     />
@@ -91,7 +91,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 ) : (
                   <div className="w-10 h-10 flex items-center justify-center">
                     <img 
-                      src="/logo-hoi-tho-xanh.svg" 
+                      src="/font/hoi-tho-xanh-white.svg" 
                       alt="Hơi Thở Xanh" 
                       className="w-full h-full object-contain" 
                     />

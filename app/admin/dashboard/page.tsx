@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { 
   Package, 
@@ -61,6 +61,11 @@ export default function AdminDashboardPage() {
   }, []);
 
   const prepareChartData = (orders: any[]) => {
+    // Memoize để tránh re-render vô cực
+    if (!orders || orders.length === 0) {
+      setChartData(null);
+      return;
+    }
     // Revenue chart (last 7 days)
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = new Date();
@@ -196,8 +201,12 @@ export default function AdminDashboardPage() {
         time: new Date(q.answered_at).toLocaleDateString('vi-VN')
       })));
 
-      // Prepare chart data
-      prepareChartData(orders);
+      // Prepare chart data (chỉ gọi 1 lần khi có data)
+      if (orders.length > 0) {
+        prepareChartData(orders);
+      } else {
+        setChartData(null);
+      }
       
       setLoading(false);
     } catch (error) {
@@ -322,6 +331,9 @@ export default function AdminDashboardPage() {
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: {
+                  duration: 0, // Disable animation để tránh lag
+                },
                 plugins: {
                   legend: {
                     display: true,
@@ -362,6 +374,9 @@ export default function AdminDashboardPage() {
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: {
+                  duration: 0, // Disable animation để tránh lag
+                },
                 plugins: {
                   legend: {
                     display: true,
@@ -395,6 +410,9 @@ export default function AdminDashboardPage() {
                   options={{
                     responsive: true,
                     maintainAspectRatio: true,
+                    animation: {
+                      duration: 0, // Disable animation để tránh lag
+                    },
                     plugins: {
                       legend: {
                         display: true,
