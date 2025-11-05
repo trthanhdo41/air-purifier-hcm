@@ -202,11 +202,14 @@ export default function AdminDashboardPage() {
       })));
 
       // Prepare chart data (chỉ gọi 1 lần khi có data)
-      if (orders.length > 0) {
-        prepareChartData(orders);
-      } else {
-        setChartData(null);
-      }
+      // Use setTimeout để tránh re-render loop
+      setTimeout(() => {
+        if (orders.length > 0) {
+          prepareChartData(orders);
+        } else {
+          setChartData(null);
+        }
+      }, 0);
       
       setLoading(false);
     } catch (error) {
@@ -317,7 +320,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Charts Section */}
-      {chartData && (
+      {chartData && !loading && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
