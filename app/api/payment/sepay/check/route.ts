@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const rawCode = searchParams.get('orderCode');
+    const debug = searchParams.get('debug') === '1';
 
     if (!rawCode) {
       return NextResponse.json(
@@ -35,6 +36,8 @@ export async function GET(request: NextRequest) {
     const normalized = normalizeOrderCode(rawCode);
     const variants = Array.from(new Set([
       normalized,
+      rawCode.trim(),
+      rawCode.trim().replace(/\s+/g, ''),
       normalized.replace(/-/g, ''),
       normalized.replace(/-/g, '–'),
       normalized.replace(/-/g, '—'),
@@ -65,6 +68,7 @@ export async function GET(request: NextRequest) {
           {
             success: true,
             isPaid: false,
+            ...(debug ? { debug: { rawCode, normalized, variants, found: 0 } } : {}),
           },
           {
             headers: {
@@ -78,6 +82,7 @@ export async function GET(request: NextRequest) {
           success: true,
           isPaid: fuzzy.payment_status === 'paid',
           order: fuzzy.payment_status === 'paid' ? fuzzy : null,
+          ...(debug ? { debug: { rawCode, normalized, variants, found: 1, matched: fuzzy.order_number } } : {}),
         },
         {
           headers: {
@@ -102,6 +107,7 @@ export async function GET(request: NextRequest) {
         success: true,
         isPaid,
         order: isPaid ? order : null,
+        ...(debug ? { debug: { rawCode, normalized, variants, found: 1, matched: order.order_number } } : {}),
       },
       {
         headers: {
