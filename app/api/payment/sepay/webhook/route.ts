@@ -189,7 +189,14 @@ export async function POST(request: NextRequest) {
     });
 
     // Force update payment_status - KHÔNG check payment_status hiện tại
-    const { data: updatedOrder, error: updateError } = await supabase
+    console.log('🔄 Attempting to update order:', {
+      order_id: order.id,
+      order_number: order.order_number,
+      current_payment_status: order.payment_status,
+      target_payment_status: 'paid',
+    });
+
+    const { data: updatedOrder, error: updateError, count } = await supabase
       .from('orders')
       .update({
         payment_status: 'paid',
@@ -200,6 +207,14 @@ export async function POST(request: NextRequest) {
       .eq('id', order.id)
       .select('payment_status, status, transaction_id')
       .single();
+
+    console.log('🔄 Update result:', {
+      hasError: !!updateError,
+      error: updateError?.message,
+      hasData: !!updatedOrder,
+      updatedOrder,
+      count,
+    });
 
     if (updateError) {
       console.error('❌ Error updating order:', updateError);
@@ -212,13 +227,25 @@ export async function POST(request: NextRequest) {
 
     if (!updatedOrder) {
       console.error('❌ Update returned no data:', { order_id: order.id });
+      // Thử query lại để xem order có tồn tại không
+      const { data: checkOrder, error: checkError } = await supabase
+        .from('orders')
+        .select('id, payment_status, status')
+        .eq('id', order.id)
+        .single();
+      console.error('❌ Order check after failed update:', { checkOrder, checkError });
       return NextResponse.json(
-        { success: false, error: 'Update returned no data' },
+        { success: false, error: 'Update returned no data', checkOrder, checkError },
         { status: 500 }
       );
     }
 
     // Verify update was successful - DOUBLE CHECK
+    console.log('🔍 Verifying update...', { order_id: order.id });
+    
+    // Wait a bit to ensure DB write is complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     const { data: verifyOrder, error: verifyError } = await supabase
       .from('orders')
       .select('payment_status, status, transaction_id')
@@ -236,15 +263,37 @@ export async function POST(request: NextRequest) {
       verify_error: verifyError?.message,
     });
 
-    // Nếu verify thất bại, log warning nhưng vẫn trả về success
+    // Nếu verify thất bại, LOG ERROR và TRẢ VỀ ERROR
     if (verifyError || !verifyOrder || verifyOrder.payment_status !== 'paid') {
-      console.error('⚠️ WARNING: Update verification failed!', {
+      console.error('❌ CRITICAL: Update verification failed!', {
         verifyError: verifyError?.message,
         verifyOrder,
         expected: 'paid',
         actual: verifyOrder?.payment_status,
+        updated_data_payment_status: updatedOrder?.payment_status,
       });
+      
+      // TRẢ VỀ ERROR để SEPay retry
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Update verification failed',
+          details: {
+            expected: 'paid',
+            actual: verifyOrder?.payment_status,
+            updated_data: updatedOrder,
+            verified_data: verifyOrder,
+          }
+        },
+        { status: 500 }
+      );
     }
+    
+    console.log('✅ Update verified successfully:', {
+      order_id: order.id,
+      payment_status: verifyOrder.payment_status,
+      status: verifyOrder.status,
+    });
 
     // TODO: Gửi email xác nhận thanh toán cho khách hàng
     // await sendPaymentConfirmationEmail(order);
