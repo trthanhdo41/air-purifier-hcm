@@ -44,53 +44,81 @@ export async function GET(request: NextRequest) {
       normalized.replace(/-/g, '—'),
     ]));
 
-    console.log('🔍 Check API - Searching order with variants:', { rawCode, normalized, variants });
+    console.log('🔍 Check API - Searching order:', { rawCode, normalized, variants });
 
-    // ĐỒNG BỘ LOGIC MATCHING VỚI WEBHOOK - Tìm order theo order_number
+    // QUERY TRỰC TIẾP BẰNG order_number CHÍNH XÁC TRƯỚC (giống admin page query)
+    // Admin page query tất cả orders và thấy paid → Check API phải query đúng order đó
     let order = null;
     
-    // Strategy 1: Tìm bằng variants (giống webhook)
-    let { data: foundOrders, error: findError } = await supabase
+    // Strategy 1: Query trực tiếp bằng order_number chính xác (ưu tiên nhất)
+    console.log('🔍 Check API - Strategy 1: Direct query by exact order_number:', rawCode.trim());
+    let { data: directOrders, error: directError } = await supabase
       .from('orders')
       .select('*')
-      .in('order_number', variants)
+      .eq('order_number', rawCode.trim())
       .order('created_at', { ascending: false })
       .limit(1);
-    order = Array.isArray(foundOrders) && foundOrders.length > 0 ? foundOrders[0] : null;
+    
+    order = Array.isArray(directOrders) && directOrders.length > 0 ? directOrders[0] : null;
+    
+    if (order) {
+      console.log('✅ Check API - Order found via direct query:', {
+        order_number: order.order_number,
+        payment_status: order.payment_status,
+        status: order.status,
+        id: order.id,
+      });
+    } else {
+      console.log('❌ Check API - Direct query failed:', { 
+        rawCode: rawCode.trim(), 
+        error: directError?.message,
+        found: directOrders?.length || 0,
+      });
+    }
 
-    console.log('🔍 Check API - First search result:', { 
-      foundCount: foundOrders?.length || 0, 
-      order: order ? { 
-        id: order.id, 
-        order_number: order.order_number, 
-        payment_status: order.payment_status 
-      } : null, 
-      error: findError?.message 
-    });
-
-    // Strategy 2: Thử tìm theo biến thể không dấu (giống webhook)
-    if (findError || !order) {
-      const noDashVariant = normalized.replace(/-/g, '');
-      console.log('🔍 Check API - Trying noDashVariant:', noDashVariant);
-      const retry = await supabase
+    // Strategy 2: Nếu không tìm thấy, thử với normalized (giống webhook)
+    if (!order) {
+      console.log('🔍 Check API - Strategy 2: Query by normalized:', normalized);
+      let { data: foundOrders, error: findError } = await supabase
         .from('orders')
         .select('*')
-        .in('order_number', [noDashVariant, noDashVariant.replace(/-/g, '–'), noDashVariant.replace(/-/g, '—')])
+        .eq('order_number', normalized)
         .order('created_at', { ascending: false })
         .limit(1);
-
-      if (!retry.error && Array.isArray(retry.data) && retry.data.length > 0) {
-        order = retry.data[0];
-        console.log('✅ Check API - Order found via noDashVariant:', {
+      
+      order = Array.isArray(foundOrders) && foundOrders.length > 0 ? foundOrders[0] : null;
+      
+      if (order) {
+        console.log('✅ Check API - Order found via normalized:', {
           order_number: order.order_number,
           payment_status: order.payment_status,
         });
       }
     }
 
-    // Strategy 3: Fallback - tìm "chứa" mã đơn (giống webhook)
+    // Strategy 3: Nếu vẫn không tìm thấy, thử với variants (giống webhook)
     if (!order) {
-      console.log('🔍 Check API - Fallback: trying ilike contains:', normalized);
+      console.log('🔍 Check API - Strategy 3: Query by variants:', variants);
+      let { data: foundOrders, error: findError } = await supabase
+        .from('orders')
+        .select('*')
+        .in('order_number', variants)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      order = Array.isArray(foundOrders) && foundOrders.length > 0 ? foundOrders[0] : null;
+      
+      if (order) {
+        console.log('✅ Check API - Order found via variants:', {
+          order_number: order.order_number,
+          payment_status: order.payment_status,
+        });
+      }
+    }
+
+    // Strategy 4: Fallback - tìm "chứa" mã đơn (giống webhook)
+    if (!order) {
+      console.log('🔍 Check API - Strategy 4: Fallback ilike contains:', normalized);
       const { data: likeOrders, error: likeErr } = await supabase
         .from('orders')
         .select('*')
