@@ -101,20 +101,51 @@ export async function GET(request: NextRequest) {
       })) || []
     );
     
-    // Test direct query by order_number
+    // Test direct query by order_number (VERIFIED WORKING in local script)
     console.log('🔍 Check API - Testing DIRECT query by order_number...');
     const { data: directQuery, error: directError } = await supabase
       .from('orders')
       .select('*')
       .eq('order_number', orderNumber)
-      .maybeSingle();
+      .single(); // Use .single() instead of .maybeSingle() for better error reporting
     
     console.log('🔍 Check API - Direct query result:', {
       found: directQuery ? 'YES' : 'NO',
       error: directError?.message,
+      error_code: directError?.code,
+      error_details: directError?.details,
       order_number: directQuery?.order_number,
       payment_status: directQuery?.payment_status,
+      total_orders: allOrders?.length,
     });
+    
+    // CRITICAL: Use direct query result if found (script verified this works)
+    if (directQuery && !directError) {
+      console.log('✅ Check API - Using DIRECT QUERY result (verified working)');
+      return NextResponse.json(
+        {
+          success: true,
+          isPaid: directQuery.payment_status === 'paid',
+          order: directQuery,
+          payment_status: directQuery.payment_status,
+          method: 'direct_query',
+          debug: {
+            orderNumber,
+            order_number: directQuery.order_number,
+            payment_status: directQuery.payment_status,
+            status: directQuery.status,
+            order_id: directQuery.id,
+          },
+        },
+        {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          },
+        }
+      );
+    }
 
     // Filter theo order_number (giống admin page filter)
     const order = Array.isArray(allOrders) 
