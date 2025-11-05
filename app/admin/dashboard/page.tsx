@@ -381,8 +381,20 @@ export default function AdminDashboardPage() {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: {
-                  duration: 1000, // Animation 1 giây khi vào trang
-                  easing: 'easeOutQuart',
+                  duration: 2000, // Animation 2 giây khi vào trang
+                  easing: 'easeOutCubic' as any,
+                },
+                transitions: {
+                  show: {
+                    animations: {
+                      x: {
+                        from: 0,
+                      },
+                      y: {
+                        from: 0,
+                      },
+                    },
+                  },
                 },
                 plugins: {
                   legend: {
@@ -390,6 +402,13 @@ export default function AdminDashboardPage() {
                     position: 'top' as const,
                   },
                   tooltip: {
+                    enabled: true,
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: { size: 14, weight: 'bold' },
+                    bodyFont: { size: 13 },
                     callbacks: {
                       label: function(context: any) {
                         return `Doanh thu: ${new Intl.NumberFormat('vi-VN').format(context.parsed.y)}đ`;
@@ -432,13 +451,42 @@ export default function AdminDashboardPage() {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: {
-                  duration: 1000, // Animation 1 giây khi vào trang
-                  easing: 'easeOutQuart',
+                  duration: 2000, // Animation 2 giây khi vào trang
+                  easing: 'easeOutCubic' as any,
+                },
+                transitions: {
+                  show: {
+                    animations: {
+                      x: {
+                        from: 0,
+                      },
+                      y: {
+                        from: 0,
+                      },
+                    },
+                  },
                 },
                 plugins: {
                   legend: {
                     display: true,
                     position: 'top' as const,
+                  },
+                  tooltip: {
+                    enabled: true,
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: { size: 14, weight: 'bold' },
+                    bodyFont: { size: 13 },
+                    callbacks: {
+                      title: function(context: any) {
+                        return `Ngày ${context[0].label}`;
+                      },
+                      label: function(context: any) {
+                        return `Số đơn hàng: ${context.parsed.y}`;
+                      },
+                    },
                   },
                 },
                   scales: {
@@ -475,8 +523,10 @@ export default function AdminDashboardPage() {
                     responsive: true,
                     maintainAspectRatio: false,
                     animation: {
-                      duration: 1000, // Animation 1 giây khi vào trang
-                      easing: 'easeOutQuart',
+                      duration: 1500, // Animation 1.5 giây khi vào trang
+                      easing: 'easeOutQuart' as any,
+                      onProgress: function() {},
+                      onComplete: function() {},
                     },
                     plugins: {
                       legend: {
@@ -484,6 +534,11 @@ export default function AdminDashboardPage() {
                         position: 'right' as const,
                       },
                       tooltip: {
+                        enabled: true,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: { size: 14, weight: 'bold' },
+                        bodyFont: { size: 13 },
                         callbacks: {
                           label: function(context: any) {
                             const label = context.label || '';
@@ -516,15 +571,27 @@ export default function AdminDashboardPage() {
                   maintainAspectRatio: false,
                   indexAxis: 'y' as const, // Horizontal bar chart
                   animation: {
-                    duration: 1000, // Animation 1 giây khi vào trang
-                    easing: 'easeOutQuart',
+                    duration: 1500, // Animation 1.5 giây khi vào trang
+                    easing: 'easeOutQuart' as any,
+                    onProgress: function() {},
+                    onComplete: function() {},
                   },
                   plugins: {
                     legend: {
                       display: false,
                     },
                     tooltip: {
+                      enabled: true,
+                      mode: 'index',
+                      intersect: false,
+                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                      padding: 12,
+                      titleFont: { size: 14, weight: 'bold' },
+                      bodyFont: { size: 13 },
                       callbacks: {
+                        title: function(context: any) {
+                          return context[0].label || '';
+                        },
                         label: function(context: any) {
                           return `Đã bán: ${context.parsed.x} sản phẩm`;
                         },
