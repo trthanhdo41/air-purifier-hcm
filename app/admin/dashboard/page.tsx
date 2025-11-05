@@ -500,6 +500,55 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+          >
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Top 5 sản phẩm bán chạy</h2>
+            <div style={{ height: '250px', position: 'relative' }}>
+              <Bar
+                data={chartData.topProductsChart}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  indexAxis: 'y' as const, // Horizontal bar chart
+                  animation: {
+                    duration: 1000, // Animation 1 giây khi vào trang
+                    easing: 'easeOutQuart',
+                  },
+                  plugins: {
+                    legend: {
+                      display: false,
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: function(context: any) {
+                          return `Đã bán: ${context.parsed.x} sản phẩm`;
+                        },
+                      },
+                    },
+                  },
+                  scales: {
+                    x: {
+                      beginAtZero: true,
+                      ticks: {
+                        stepSize: 1,
+                      },
+                    },
+                  },
+                  layout: {
+                    padding: {
+                      top: 10,
+                      bottom: 10,
+                    },
+                  },
+                }}
+              />
+            </div>
+          </motion.div>
         </div>
       )}
 
