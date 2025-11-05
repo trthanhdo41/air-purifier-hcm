@@ -202,14 +202,12 @@ export default function AdminDashboardPage() {
       })));
 
       // Prepare chart data (chỉ gọi 1 lần khi có data)
-      // Use setTimeout để tránh re-render loop
-      setTimeout(() => {
-        if (orders.length > 0) {
-          prepareChartData(orders);
-        } else {
-          setChartData(null);
-        }
-      }, 0);
+      // Chỉ prepare khi orders có data và chartData chưa có
+      if (orders.length > 0 && !chartData) {
+        prepareChartData(orders);
+      } else if (orders.length === 0) {
+        setChartData(null);
+      }
       
       setLoading(false);
     } catch (error) {
@@ -329,40 +327,52 @@ export default function AdminDashboardPage() {
             className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-900 mb-4">Doanh thu 7 ngày qua</h2>
-            <Line
-              data={chartData.revenueChart}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: {
-                  duration: 0, // Disable animation để tránh lag
-                },
-                plugins: {
-                  legend: {
-                    display: true,
-                    position: 'top' as const,
-                  },
-                  tooltip: {
-                    callbacks: {
-                      label: function(context: any) {
-                        return `Doanh thu: ${new Intl.NumberFormat('vi-VN').format(context.parsed.y)}đ`;
+            <div style={{ height: '250px', position: 'relative' }}>
+              <Line
+                data={chartData.revenueChart}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  animation: false, // Hoàn toàn disable animation
+                  transitions: {
+                    active: {
+                      animation: {
+                        duration: 0,
                       },
                     },
                   },
-                },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    ticks: {
-                      callback: function(value: any) {
-                        return new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(value);
+                  plugins: {
+                    legend: {
+                      display: true,
+                      position: 'top' as const,
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: function(context: any) {
+                          return `Doanh thu: ${new Intl.NumberFormat('vi-VN').format(context.parsed.y)}đ`;
+                        },
                       },
                     },
                   },
-                },
-              }}
-              height={250}
-            />
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        callback: function(value: any) {
+                          return new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(value);
+                        },
+                      },
+                    },
+                  },
+                  layout: {
+                    padding: {
+                      top: 10,
+                      bottom: 10,
+                    },
+                  },
+                }}
+              />
+            </div>
           </motion.div>
 
           <motion.div
@@ -372,31 +382,43 @@ export default function AdminDashboardPage() {
             className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-900 mb-4">Đơn hàng 7 ngày qua</h2>
-            <Bar
-              data={chartData.ordersChart}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: {
-                  duration: 0, // Disable animation để tránh lag
-                },
-                plugins: {
-                  legend: {
-                    display: true,
-                    position: 'top' as const,
-                  },
-                },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    ticks: {
-                      stepSize: 1,
+            <div style={{ height: '250px', position: 'relative' }}>
+              <Bar
+                data={chartData.ordersChart}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  animation: false, // Hoàn toàn disable animation
+                  transitions: {
+                    active: {
+                      animation: {
+                        duration: 0,
+                      },
                     },
                   },
-                },
-              }}
-              height={250}
-            />
+                  plugins: {
+                    legend: {
+                      display: true,
+                      position: 'top' as const,
+                    },
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        stepSize: 1,
+                      },
+                    },
+                  },
+                  layout: {
+                    padding: {
+                      top: 10,
+                      bottom: 10,
+                    },
+                  },
+                }}
+              />
+            </div>
           </motion.div>
 
           <motion.div
@@ -407,14 +429,19 @@ export default function AdminDashboardPage() {
           >
             <h2 className="text-lg font-bold text-gray-900 mb-4">Phân bố trạng thái đơn hàng</h2>
             <div className="flex items-center justify-center">
-              <div className="w-full max-w-md">
+              <div className="w-full max-w-md" style={{ height: '300px', position: 'relative' }}>
                 <Doughnut
                   data={chartData.statusChart}
                   options={{
                     responsive: true,
-                    maintainAspectRatio: true,
-                    animation: {
-                      duration: 0, // Disable animation để tránh lag
+                    maintainAspectRatio: false,
+                    animation: false, // Hoàn toàn disable animation
+                    transitions: {
+                      active: {
+                        animation: {
+                          duration: 0,
+                        },
+                      },
                     },
                     plugins: {
                       legend: {
