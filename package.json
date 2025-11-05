@@ -11,6 +11,7 @@
     "test:find-order": "node scripts/test-find-order.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
     "chart.js": "^4.5.1",

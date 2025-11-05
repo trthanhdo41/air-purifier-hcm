@@ -17,7 +17,8 @@ import {
   Settings,
   MessageCircle,
   FolderTree,
-  Newspaper
+  Newspaper,
+  Bot
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -35,6 +36,7 @@ const menuItems = [
   { icon: Newspaper, label: "Tin tức", path: "/admin/news" },
   { icon: FileText, label: "Hỏi đáp", path: "/admin/contacts" },
   { icon: MessageCircle, label: "CSKH", path: "/admin/customer-service" },
+  { icon: Bot, label: "AI Chatbot", path: "/admin/chatbot/settings" },
   { icon: Settings, label: "Cài đặt", path: "/admin/settings" },
 ];
 

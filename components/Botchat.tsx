@@ -6,6 +6,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/lib/stores/auth";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 
 type ViewType = 'welcome' | 'orders' | 'warranty' | 'chat';
 
@@ -19,8 +23,24 @@ export default function Botchat() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [aiResponding, setAiResponding] = useState(false);
   const { user } = useAuthStore();
   const router = useRouter();
+
+  // Generate or get session ID
+  useEffect(() => {
+    if (user && !sessionId) {
+      const storedSessionId = localStorage.getItem(`chat_session_${user.id}`);
+      if (storedSessionId) {
+        setSessionId(storedSessionId);
+      } else {
+        const newSessionId = `session_${user.id}_${Date.now()}`;
+        localStorage.setItem(`chat_session_${user.id}`, newSessionId);
+        setSessionId(newSessionId);
+      }
+    }
+  }, [user, sessionId]);
 
   const fetchOrders = async () => {
     if (!user) return;
@@ -153,7 +173,7 @@ export default function Botchat() {
   };
 
   const sendMessage = async () => {
-    if (!user || !message.trim() || sendingMessage) {
+    if (!user || !message.trim() || sendingMessage || !sessionId) {
       if (!user) {
         setError('Vui lòng đăng nhập để gửi tin nhắn');
         setTimeout(() => setError(null), 3000);
@@ -170,6 +190,7 @@ export default function Botchat() {
       const supabase = createClient();
       console.log('Sending message:', { user_id: user.id, message: msgText });
       
+      // 1. Save user message to chat_messages (for admin to see)
       const { data, error: insertError } = await supabase
         .from('chat_messages')
         .insert({
@@ -192,9 +213,62 @@ export default function Botchat() {
         setError(errorMsg);
         setMessage(msgText); // Restore message on error
         setTimeout(() => setError(null), 5000);
-      } else {
-        console.log('Message sent successfully');
-        await fetchChatMessages();
+        return;
+      }
+
+      // 2. Update chat messages list
+      await fetchChatMessages();
+
+      // 3. Try to get AI response
+      setAiResponding(true);
+      try {
+        const aiResponse = await fetch('/api/chat/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: msgText,
+            sessionId: sessionId,
+            userId: user.id,
+            userName: user.name || user.email || '',
+            userEmail: user.email || '',
+            userPhone: user.phone || null,
+          }),
+        });
+
+        const aiData = await aiResponse.json();
+
+        if (aiData.success && aiData.message) {
+          // AI responded successfully
+          // Add AI response to chat_messages (as admin message so it shows up)
+          const { error: aiInsertError } = await supabase
+            .from('chat_messages')
+            .insert({
+              user_id: user.id,
+              user_email: user.email || '',
+              user_name: user.name || null,
+              message: aiData.message,
+              is_from_user: false,
+              is_read: false,
+              admin_id: null, // AI response, not from admin
+            });
+
+          if (aiInsertError) {
+            console.error('Error saving AI response:', aiInsertError);
+          }
+
+          // Refresh chat messages
+          await fetchChatMessages();
+        } else if (aiData.shouldWaitForAgent) {
+          // AI is disabled or offline, wait for agent
+          console.log('AI not available, waiting for agent');
+        }
+      } catch (aiErr: any) {
+        console.error('Error getting AI response:', aiErr);
+        // Silently fail - user message is already saved, agent can respond manually
+      } finally {
+        setAiResponding(false);
       }
     } catch (err: any) {
       console.error('Error sending message:', err);
@@ -415,13 +489,50 @@ export default function Botchat() {
                                 : 'bg-gray-200 text-gray-900 rounded-tl-none'
                             }`}
                           >
-                            <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                            {msg.is_from_user ? (
+                              // User message - plain text
+                              <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                            ) : (
+                              // AI/Admin message - render markdown
+                              <div className="text-sm prose prose-sm max-w-none break-words">
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                                  components={{
+                                    p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+                                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                                    em: ({ children }) => <em className="italic">{children}</em>,
+                                    ul: ({ children }) => <ul className="list-disc list-inside mb-1 space-y-0.5">{children}</ul>,
+                                    ol: ({ children }) => <ol className="list-decimal list-inside mb-1 space-y-0.5">{children}</ol>,
+                                    li: ({ children }) => <li className="ml-2">{children}</li>,
+                                    code: ({ children }) => <code className="bg-gray-300 px-1 rounded text-xs">{children}</code>,
+                                    blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-400 pl-2 italic">{children}</blockquote>,
+                                  }}
+                                >
+                                  {msg.message}
+                                </ReactMarkdown>
+                              </div>
+                            )}
                             <p className={`text-xs mt-1 ${msg.is_from_user ? 'text-sky-100' : 'text-gray-500'}`}>
                               {new Date(msg.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                             </p>
                           </div>
                         </div>
                       ))
+                    )}
+                    {aiResponding && (
+                      <div className="flex justify-start">
+                        <div className="max-w-[80%] rounded-lg rounded-tl-none bg-gray-200 text-gray-900 p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-1">
+                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                            </div>
+                            <span className="text-xs text-gray-500">Đang gõ...</span>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                   {error && (
@@ -538,17 +649,25 @@ export default function Botchat() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      if (currentView === 'chat') {
-                        sendMessage();
+                      if (!sendingMessage && message.trim()) {
+                        if (currentView === 'chat') {
+                          sendMessage();
+                        } else if (user && message.trim()) {
+                          // Auto switch to chat and send
+                          handleViewChange('chat');
+                          setTimeout(() => {
+                            sendMessage();
+                          }, 100);
+                        }
                       }
                     }
                   }}
                   placeholder={
                     currentView === 'chat'
-                      ? "Nhập tin nhắn của bạn..."
-                      : "Viết câu hỏi của bạn tại đây"
+                      ? "Nhập tin nhắn của bạn... (Enter để gửi)"
+                      : "Viết câu hỏi của bạn tại đây (Enter để gửi)"
                   }
-                  disabled={currentView === 'chat' && sendingMessage}
+                  disabled={sendingMessage || aiResponding}
                   className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 transition-all hover:border-sky-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
                 <motion.button 
