@@ -65,11 +65,13 @@ export async function POST(request: NextRequest) {
       orderCode.replace(/-/g, '—'),
     ]));
 
-    let { data: order, error: findError } = await supabase
+    let { data: foundOrders, error: findError } = await supabase
       .from('orders')
       .select('id, order_number, total_amount, final_amount, payment_status, created_at')
       .in('order_number', variants)
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(1);
+    let order = Array.isArray(foundOrders) && foundOrders.length > 0 ? (foundOrders[0] as any) : null;
 
     if (findError || !order) {
       // Thử tìm theo biến thể không dấu (nếu đơn lưu sai format)
@@ -78,10 +80,11 @@ export async function POST(request: NextRequest) {
         .from('orders')
         .select('id, order_number, total_amount, final_amount, payment_status, created_at')
         .in('order_number', [noDashVariant, noDashVariant.replace(/-/g, '–'), noDashVariant.replace(/-/g, '—')])
-        .maybeSingle();
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-      if (!retry.error && retry.data) {
-        order = retry.data as any;
+      if (!retry.error && Array.isArray(retry.data) && retry.data.length > 0) {
+        order = retry.data[0] as any;
       }
     }
 

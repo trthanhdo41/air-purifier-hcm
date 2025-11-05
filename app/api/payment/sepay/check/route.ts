@@ -41,11 +41,14 @@ export async function GET(request: NextRequest) {
     ]));
 
     // Tìm order theo order_number
-    const { data: order, error } = await supabase
+    const { data: orders, error } = await supabase
       .from('orders')
       .select('*')
       .in('order_number', variants)
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const order = Array.isArray(orders) && orders.length > 0 ? orders[0] : null;
 
     if (error || !order) {
       console.log('❌ Order not found:', { rawCode, normalized, variants, error: error?.message });
