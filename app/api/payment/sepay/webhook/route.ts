@@ -165,22 +165,22 @@ export async function POST(request: NextRequest) {
 function extractOrderCode(content: string): string | null {
   if (!content) return null;
 
-  // 1) Chuẩn: HTX-<digits>-<A-Z0-9>
-  let m = content.match(/HTX-\d+-[A-Z0-9]+/i);
+  // 1) Chuẩn: HTX-<13digits>-<A-Z0-9>
+  let m = content.match(/HTX-(\d{13})-([A-Z0-9]+)/i);
   if (m) return m[0].toUpperCase();
 
-  // 2) Không dấu gạch: HTX<digits><A-Z0-9>
+  // 2) Không dấu gạch: HTX<13digits><A-Z0-9>
   // Ví dụ: HTX1762329381717BWJ46RGL3
-  // Thử tách 13 chữ số liên tiếp làm timestamp, phần còn lại là code
-  const noDash = content.match(/HTX\s*([0-9]{12,14})([A-Z0-9]{6,16})/i);
+  // Tách CHÍNH XÁC 13 chữ số làm timestamp (Date.now()) rồi phần còn lại là code
+  const noDash = content.match(/HTX\s*([0-9]{13})([A-Z0-9]{6,16})/i);
   if (noDash) {
     const ts = noDash[1].toUpperCase();
     const code = noDash[2].toUpperCase();
     return `HTX-${ts}-${code}`;
   }
 
-  // 3) Có thể có khoảng trắng thay vì dấu gạch
-  m = content.match(/HTX\s*-?\s*(\d{12,14})\s*-?\s*([A-Z0-9]{6,16})/i);
+  // 3) Có thể có khoảng trắng hoặc dấu gạch lộn xộn
+  m = content.match(/HTX\s*-?\s*(\d{13})\s*-?\s*([A-Z0-9]{6,16})/i);
   if (m) {
     return `HTX-${m[1].toUpperCase()}-${m[2].toUpperCase()}`;
   }
