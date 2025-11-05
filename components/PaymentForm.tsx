@@ -148,11 +148,11 @@ export default function PaymentForm({ paymentMethod, onPaymentMethodChange }: Pa
                   <div className="flex items-center gap-1.5 text-xs text-blue-600">
                     <Banknote className="w-3.5 h-3.5" />
                     <span className="font-medium">Không phí giao dịch</span>
-                  </div>
+                </div>
                   <div className="flex items-center gap-1.5 text-xs text-blue-600">
                     <CheckCircle className="w-3.5 h-3.5" />
                     <span className="font-medium">Xác nhận tức thì</span>
-                  </div>
+                </div>
                 </div>
               </div>
             </motion.div>

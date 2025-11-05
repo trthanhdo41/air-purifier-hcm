@@ -37,10 +37,8 @@ export async function POST(request: NextRequest) {
 
     if (!orderCode) {
       console.error('❌ Order code not found in payload. Full payload:', payload);
-      return NextResponse.json(
-        { success: false, error: 'Order code not found', received: payload },
-        { status: 400 }
-      );
+      // Trả về success: true để Sepay không retry, nhưng không cập nhật đơn
+      return NextResponse.json({ success: true, message: 'Order code not found, ignored' });
     }
 
     console.log('✅ Order code extracted:', orderCode);
@@ -63,10 +61,8 @@ export async function POST(request: NextRequest) {
 
     if (findError || !order) {
       console.error('❌ Order not found:', orderCode, findError);
-      return NextResponse.json(
-        { success: false, error: 'Order not found' },
-        { status: 404 }
-      );
+      // Trả về success: true để Sepay ghi nhận đã xử lý webhook
+      return NextResponse.json({ success: true, message: 'Order not found, ignored' });
     }
 
     // Kiểm tra đơn hàng đã được thanh toán chưa (tránh duplicate)
@@ -80,9 +76,9 @@ export async function POST(request: NextRequest) {
 
     // Verify số tiền (optional, để đảm bảo chính xác)
     const receivedAmount = payload.amount || payload.transferAmount || payload.value || 0;
-    if (receivedAmount && Math.abs(receivedAmount - order.final_amount) > 1) {
+    if (receivedAmount && Math.abs(receivedAmount - order.total_amount) > 1) {
       console.warn(
-        `⚠️ Amount mismatch: Expected ${order.final_amount}, got ${receivedAmount}`
+        `⚠️ Amount mismatch: Expected ${order.total_amount}, got ${receivedAmount}`
       );
     }
 

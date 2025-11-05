@@ -32,38 +32,38 @@ export default function SuccessPage() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex flex-col">
       <Header />
       <div className="flex-1 flex justify-center py-6 sm:py-8 px-4 relative overflow-hidden">
-        {/* Confetti Animation */}
-        {showConfetti && (
+      {/* Confetti Animation */}
+      {showConfetti && (
           <div className="absolute inset-0 pointer-events-none z-10">
-            {[...Array(50)].map((_, i) => (
-              <motion.div
-                key={i}
-                initial={{ 
+          {[...Array(50)].map((_, i) => (
+            <motion.div
+              key={i}
+              initial={{ 
                   x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000),
-                  y: -10,
-                  rotate: 0,
-                  scale: 1
-                }}
-                animate={{ 
+                y: -10,
+                rotate: 0,
+                scale: 1
+              }}
+              animate={{ 
                   y: (typeof window !== 'undefined' ? window.innerHeight : 800) + 10,
-                  rotate: 360,
-                  scale: 0
-                }}
-                transition={{ 
-                  duration: 3,
-                  delay: Math.random() * 2,
-                  ease: "easeOut"
-                }}
-                className="absolute w-2 h-2 rounded-full"
-                style={{
-                  backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'][Math.floor(Math.random() * 5)]
-                }}
-              />
-            ))}
-          </div>
-        )}
+                rotate: 360,
+                scale: 0
+              }}
+              transition={{ 
+                duration: 3,
+                delay: Math.random() * 2,
+                ease: "easeOut"
+              }}
+              className="absolute w-2 h-2 rounded-full"
+              style={{
+                backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'][Math.floor(Math.random() * 5)]
+              }}
+            />
+          ))}
+        </div>
+      )}
 
-        <motion.div
+      <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
@@ -191,7 +191,7 @@ export default function SuccessPage() {
             </motion.div>
           </motion.div>
         </div>
-        </motion.div>
+      </motion.div>
       </div>
       <Footer />
     </div>

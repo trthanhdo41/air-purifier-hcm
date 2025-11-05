@@ -215,36 +215,36 @@ export default function CheckoutPage() {
       }
 
             // Handle payment method
-            if (formData.paymentMethod === 'sepay') {
-              try {
+    if (formData.paymentMethod === 'sepay') {
+      try {
                 const orderCode = orderData.order.order_number;
                 const res = await fetch(`/api/payment/sepay/create`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ 
                     amount: finalAmount, 
                     orderCode, 
                     description: `Thanh toan don hang ${orderCode}`,
                     orderId: orderData.order.id,
                   }),
-                });
-                const data = await res.json();
+        });
+        const data = await res.json();
                 
                 if (data?.success && data?.qrData) {
                   // Hiển thị QR code modal ngay lập tức
                   setSepayQRData(data.qrData);
                   setShowSepayQR(true);
-                  return;
-                }
+          return;
+        }
                 
                 alert('Không thể tạo thanh toán. Vui lòng thử lại hoặc chọn phương thức khác.');
-                return;
-              } catch (err) {
+        return;
+      } catch (err) {
                 console.error('Sepay error:', err);
                 alert('Có lỗi xảy ra khi tạo thanh toán. Vui lòng thử lại.');
-                return;
-              }
-            }
+        return;
+      }
+    }
 
             // For COD, clear cart and redirect to success page
             if (buyNowItems.length > 0) {
@@ -629,8 +629,8 @@ export default function CheckoutPage() {
                         </>
                       ) : (
                         <>
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Đặt hàng
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Đặt hàng
                         </>
                       )}
                     </Button>
