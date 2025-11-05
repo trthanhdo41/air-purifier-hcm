@@ -443,6 +443,9 @@ export default function AdminDashboardPage() {
                       intersect: false,
                       position: function(context: any) {
                         // Custom position để tooltip hiển thị đúng vị trí chuột
+                        if (!context || !context[0] || !context[0].element) {
+                          return 'nearest' as any;
+                        }
                         const point = context[0];
                         const x = point.element.x;
                         const y = point.element.y;
@@ -519,6 +522,9 @@ export default function AdminDashboardPage() {
                     intersect: true,
                     position: function(context: any) {
                       // Custom position để tooltip hiển thị đúng vị trí chuột
+                      if (!context || !context[0] || !context[0].element) {
+                        return 'nearest' as any;
+                      }
                       const point = context[0];
                       const x = point.element.x;
                       const y = point.element.y;
@@ -609,6 +615,9 @@ export default function AdminDashboardPage() {
                       enabled: true,
                       position: function(context: any) {
                         // Custom position để tooltip hiển thị đúng vị trí chuột
+                        if (!context || !context[0] || !context[0].element) {
+                          return 'nearest' as any;
+                        }
                         const point = context[0];
                         const x = point.element.x;
                         const y = point.element.y;
@@ -673,6 +682,9 @@ export default function AdminDashboardPage() {
                       intersect: true,
                       position: function(context: any) {
                         // Custom position để tooltip hiển thị đúng vị trí chuột
+                        if (!context || !context[0] || !context[0].element) {
+                          return 'nearest' as any;
+                        }
                         const point = context[0];
                         const x = point.element.x;
                         const y = point.element.y;
