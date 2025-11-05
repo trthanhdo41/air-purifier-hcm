@@ -226,7 +226,8 @@ export default function AdminDashboardPage() {
     {
       icon: DollarSign,
       label: "Doanh thu",
-      value: new Intl.NumberFormat('vi-VN').format(stats.totalRevenue),
+      value: stats.totalRevenue, // Number để animate
+      suffix: 'đ', // Suffix để thêm sau số
       color: "green",
       bgColor: "bg-green-50",
       iconColor: "text-green-600",
@@ -293,7 +294,10 @@ export default function AdminDashboardPage() {
               <p className="text-gray-600 text-sm font-medium">{stat.label}</p>
               <div className="text-2xl font-bold text-gray-900 mt-2">
                 {typeof stat.value === 'number' ? (
-                  <CounterAnimation value={stat.value} />
+                  <>
+                    <CounterAnimation value={stat.value} />
+                    {(stat as any).suffix && <span>{(stat as any).suffix}</span>}
+                  </>
                 ) : (
                   <CounterAnimation value={stat.value} />
                 )}
