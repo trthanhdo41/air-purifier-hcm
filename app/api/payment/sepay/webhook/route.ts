@@ -67,8 +67,11 @@ export async function POST(request: NextRequest) {
 
     // Tìm order theo order_number
     // Thử tìm theo nhiều biến thể của mã đơn để tránh sai khác dấu gạch
+    const rawInput = typeof extracted === 'string' ? extracted : extracted?.short || extracted?.full || '';
     const variants = Array.from(new Set([
       orderCode,
+      rawInput.trim(),
+      rawInput.trim().replace(/\s+/g, ''),
       orderCode.replace(/-/g, ''),
       orderCode.replace(/-/g, '–'),
       orderCode.replace(/-/g, '—'),
