@@ -15,13 +15,14 @@ interface NewsItem {
 }
 
 // Generate metadata for SEO
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   try {
+    const { slug } = await params;
     const supabase = await createClient();
     const { data } = await supabase
       .from('news')
       .select('*')
-      .eq('slug', params.slug)
+      .eq('slug', slug)
       .eq('status', 'published')
       .single();
 
