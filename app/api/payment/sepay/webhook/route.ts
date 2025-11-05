@@ -78,6 +78,10 @@ export async function POST(request: NextRequest) {
       order = retry.data as any;
     }
 
+    if (!order) {
+      return NextResponse.json({ success: true, message: 'Order lookup resulted in null' });
+    }
+
     // Kiểm tra đơn hàng đã được thanh toán chưa (tránh duplicate)
     if (order.payment_status === 'paid') {
       console.log('✅ Order already paid:', orderCode);
