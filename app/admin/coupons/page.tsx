@@ -26,6 +26,9 @@ interface Coupon {
 export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [showModal, setShowModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
@@ -91,6 +94,7 @@ export default function CouponsPage() {
     }
 
     try {
+      setIsSaving(true);
       const supabase = createClient();
       const couponData: any = {
         code: formData.code.toUpperCase(),
@@ -129,6 +133,8 @@ export default function CouponsPage() {
     } catch (error: any) {
       console.error('Error saving coupon:', error);
       setToast({ message: 'Lỗi: ' + (error.message || 'Lỗi không xác định'), type: 'error' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -154,6 +160,7 @@ export default function CouponsPage() {
     if (!confirm('Bạn có chắc chắn muốn xóa mã giảm giá này?')) return;
 
     try {
+      setDeletingIds(prev => new Set(prev).add(id));
       const supabase = createClient();
       const { error } = await supabase
         .from('coupons')
@@ -166,11 +173,18 @@ export default function CouponsPage() {
     } catch (error: any) {
       console.error('Error deleting coupon:', error);
       setToast({ message: 'Lỗi khi xóa: ' + (error.message || 'Lỗi không xác định'), type: 'error' });
+    } finally {
+      setDeletingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
     }
   };
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
     try {
+      setTogglingIds(prev => new Set(prev).add(id));
       const supabase = createClient();
       const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
       const { error } = await supabase
@@ -184,6 +198,12 @@ export default function CouponsPage() {
     } catch (error: any) {
       console.error('Error updating status:', error);
       setToast({ message: 'Lỗi khi cập nhật trạng thái: ' + (error.message || 'Lỗi không xác định'), type: 'error' });
+    } finally {
+      setTogglingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
     }
   };
 
@@ -346,21 +366,33 @@ export default function CouponsPage() {
                           </button>
                           <button
                             onClick={() => handleToggleStatus(coupon.id, coupon.status)}
-                            className={`p-2 rounded-lg transition-colors ${
+                            disabled={togglingIds.has(coupon.id)}
+                            className={`p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                               coupon.status === 'active'
                                 ? 'text-yellow-600 hover:bg-yellow-50'
                                 : 'text-green-600 hover:bg-green-50'
                             }`}
                             title={coupon.status === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt'}
                           >
-                            {coupon.status === 'active' ? <X className="w-4 h-4" /> : <Tag className="w-4 h-4" />}
+                            {togglingIds.has(coupon.id) ? (
+                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                            ) : coupon.status === 'active' ? (
+                              <X className="w-4 h-4" />
+                            ) : (
+                              <Tag className="w-4 h-4" />
+                            )}
                           </button>
                           <button
                             onClick={() => handleDelete(coupon.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            disabled={deletingIds.has(coupon.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Xóa"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            {deletingIds.has(coupon.id) ? (
+                              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
                           </button>
                         </div>
                       </td>
@@ -559,9 +591,17 @@ export default function CouponsPage() {
                   <div className="flex gap-3 pt-4">
                     <Button
                       onClick={handleSubmit}
-                      className="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white"
+                      disabled={isSaving}
+                      className="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isEditMode ? "Cập nhật" : "Tạo mã giảm giá"}
+                      {isSaving ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          {isEditMode ? "Đang cập nhật..." : "Đang tạo..."}
+                        </>
+                      ) : (
+                        isEditMode ? "Cập nhật" : "Tạo mã giảm giá"
+                      )}
                     </Button>
                     <Button
                       onClick={() => {

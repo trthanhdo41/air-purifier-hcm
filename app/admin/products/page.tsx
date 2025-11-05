@@ -31,6 +31,9 @@ export default function ProductsPage() {
   const [productList, setProductList] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -111,6 +114,7 @@ export default function ProductsPage() {
     const primaryImage = imagesArray[0];
 
     try {
+      setIsCreating(true);
       const supabase = createClient();
       const { data, error } = await supabase
         .from('products')
@@ -150,6 +154,8 @@ export default function ProductsPage() {
       setToast({ message: "Thêm sản phẩm thành công!", type: 'success' });
     } catch (error) {
       setToast({ message: 'Lỗi khi thêm sản phẩm', type: 'error' });
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -193,6 +199,7 @@ export default function ProductsPage() {
     const primaryImage = imagesArray.length > 0 ? imagesArray[0] : formData.image || null;
     
     try {
+      setIsUpdating(true);
       const supabase = createClient();
       const { data, error } = await supabase
         .from('products')
@@ -224,6 +231,8 @@ export default function ProductsPage() {
       setToast({ message: "Cập nhật sản phẩm thành công!", type: 'success' });
     } catch (error) {
       setToast({ message: 'Lỗi khi cập nhật sản phẩm', type: 'error' });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -233,6 +242,7 @@ export default function ProductsPage() {
     }
 
     try {
+      setDeletingIds(prev => new Set(prev).add(productId));
       const supabase = createClient();
       const { error } = await supabase
         .from('products')
@@ -248,6 +258,12 @@ export default function ProductsPage() {
       setToast({ message: "Đã xóa sản phẩm thành công!", type: 'success' });
     } catch (error) {
       setToast({ message: 'Lỗi khi xóa sản phẩm', type: 'error' });
+    } finally {
+      setDeletingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(productId);
+        return newSet;
+      });
     }
   };
 
@@ -381,9 +397,14 @@ export default function ProductsPage() {
                             variant="outline" 
                             size="sm"
                             onClick={() => handleDeleteProduct(product.id)}
-                            className="text-red-600 hover:text-red-700"
+                            disabled={deletingIds.has(product.id)}
+                            className="text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            {deletingIds.has(product.id) ? (
+                              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
                           </Button>
                         </div>
                       </td>
@@ -616,9 +637,17 @@ export default function ProductsPage() {
                   <div className="flex gap-3 pt-4">
                     <Button
                       onClick={isEditMode ? handleUpdateProduct : handleCreateProduct}
-                      className="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white"
+                      disabled={isCreating || isUpdating}
+                      className="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isEditMode ? 'Lưu thay đổi' : 'Thêm sản phẩm'}
+                      {(isCreating || isUpdating) ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          {isEditMode ? 'Đang cập nhật...' : 'Đang thêm...'}
+                        </>
+                      ) : (
+                        isEditMode ? 'Lưu thay đổi' : 'Thêm sản phẩm'
+                      )}
                     </Button>
                     <Button
                       onClick={() => { setShowModal(false); setIsEditMode(false); setEditingProductId(null); }}

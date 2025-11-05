@@ -1,27 +1,142 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Edit, Trash2, X, Newspaper, Eye, Calendar, User } from "lucide-react";
+import { Plus, Search, Edit, Trash2, X, Newspaper, Eye, Calendar, User, Bold, Italic, Link, Image, List, Heading1, Heading2, Heading3, Type, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import Toast from "@/components/Toast";
 import { useAuthStore } from "@/lib/stores/auth";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 
-// Content Editor Component
-// Note: Rich text editor (Quill) sẽ được thêm sau khi cài đặt react-quill
+// Rich Text Editor Component với Markdown + Toolbar
 function ContentEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showPreview, setShowPreview] = useState(false);
+
+  const insertText = (before: string, after: string = '') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = value.substring(start, end);
+    const newText = value.substring(0, start) + before + selectedText + after + value.substring(end);
+    
+    onChange(newText);
+    
+    // Focus lại và đặt cursor
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = start + before.length + selectedText.length + after.length;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
+
+  const insertImage = () => {
+    const url = window.prompt('Nhập URL hình ảnh:');
+    if (url) {
+      insertText(`![alt text](${url})`, '');
+    }
+  };
+
+  const insertLink = () => {
+    const text = window.prompt('Nhập text cho link:');
+    if (text) {
+      const url = window.prompt('Nhập URL:');
+      if (url) {
+        insertText(`[${text}](`, `${url})`);
+      }
+    }
+  };
+
+  const toolbarButtons = [
+    { icon: Bold, label: 'Bold', action: () => insertText('**', '**') },
+    { icon: Italic, label: 'Italic', action: () => insertText('*', '*') },
+    { icon: Heading1, label: 'H1', action: () => insertText('# ', '') },
+    { icon: Heading2, label: 'H2', action: () => insertText('## ', '') },
+    { icon: Heading3, label: 'H3', action: () => insertText('### ', '') },
+    { icon: List, label: 'List', action: () => insertText('- ', '') },
+    { icon: Link, label: 'Link', action: insertLink },
+    { icon: Image, label: 'Image', action: insertImage },
+  ];
+
   return (
-    <>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={15}
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-2 focus:ring-sky-100 outline-none text-sm"
-        placeholder="Nhập nội dung tin tức..."
-        required
-      />
-    </>
+    <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-100">
+      {/* Toolbar */}
+      <div className="flex items-center gap-1 p-2 bg-gray-50 border-b border-gray-200 flex-wrap">
+        {toolbarButtons.map((btn, idx) => {
+          const Icon = btn.icon;
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                btn.action();
+              }}
+              className="p-2 hover:bg-gray-200 rounded text-gray-700 hover:text-sky-600 transition-colors"
+              title={btn.label}
+            >
+              <Icon className="w-4 h-4" />
+            </button>
+          );
+        })}
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={() => setShowPreview(!showPreview)}
+          className={`px-3 py-1.5 text-sm rounded transition-colors ${
+            showPreview 
+              ? 'bg-sky-500 text-white' 
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          {showPreview ? '📝 Soạn' : '👁️ Xem trước'}
+        </button>
+      </div>
+
+      {/* Editor Content */}
+      <div className="flex">
+        {/* Markdown Editor */}
+        <div className={`${showPreview ? 'w-1/2 border-r border-gray-200' : 'w-full'}`}>
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            rows={20}
+            className="w-full px-4 py-3 outline-none text-sm font-mono resize-none"
+            placeholder="Nhập nội dung markdown... 
+
+# Tiêu đề lớn
+## Tiêu đề nhỏ
+**Bold text** *Italic text*
+
+- Danh sách
+- Item 2
+
+![alt](image-url)
+[Link text](url)"
+            required
+          />
+        </div>
+
+        {/* Preview */}
+        {showPreview && (
+          <div className="w-1/2 p-4 overflow-y-auto max-h-[600px] prose prose-sm max-w-none">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw, rehypeSanitize]}
+            >
+              {value || '*Chưa có nội dung*'}
+            </ReactMarkdown>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -53,6 +168,9 @@ export default function NewsPage() {
   const [editingNewsId, setEditingNewsId] = useState<string | null>(null);
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
   const [formData, setFormData] = useState({
     title: "",
@@ -192,6 +310,8 @@ export default function NewsPage() {
       setToast({ message: "Thêm tin tức thành công!", type: 'success' });
     } catch (error) {
       setToast({ message: 'Lỗi khi thêm tin tức', type: 'error' });
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -225,6 +345,7 @@ export default function NewsPage() {
     }
 
     try {
+      setIsUpdating(true);
       const supabase = createClient();
       const slug = formData.slug || generateSlug(formData.title);
 
@@ -263,6 +384,8 @@ export default function NewsPage() {
       setToast({ message: "Cập nhật tin tức thành công!", type: 'success' });
     } catch (error) {
       setToast({ message: 'Lỗi khi cập nhật tin tức', type: 'error' });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -270,6 +393,7 @@ export default function NewsPage() {
     if (!confirm(`Bạn có chắc muốn xóa tin tức này?`)) return;
 
     try {
+      setDeletingIds(prev => new Set(prev).add(newsId));
       const supabase = createClient();
       const { error } = await supabase
         .from('news')
@@ -285,6 +409,12 @@ export default function NewsPage() {
       setToast({ message: "Xóa tin tức thành công!", type: 'success' });
     } catch (error) {
       setToast({ message: 'Lỗi khi xóa tin tức', type: 'error' });
+    } finally {
+      setDeletingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(newsId);
+        return newSet;
+      });
     }
   };
 
@@ -439,9 +569,15 @@ export default function NewsPage() {
                         </button>
                         <button
                           onClick={() => handleDeleteNews(item.id)}
-                          className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          disabled={deletingIds.has(item.id)}
+                          className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Xóa"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          {deletingIds.has(item.id) ? (
+                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
                         </button>
                       </div>
                     </td>
@@ -681,9 +817,17 @@ export default function NewsPage() {
                     </Button>
                     <Button
                       onClick={isEditMode ? handleUpdateNews : handleCreateNews}
-                      className="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white"
+                      disabled={isCreating || isUpdating}
+                      className="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isEditMode ? "Cập nhật" : "Xuất bản"}
+                      {(isCreating || isUpdating) ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          {isEditMode ? "Đang cập nhật..." : "Đang tạo..."}
+                        </>
+                      ) : (
+                        isEditMode ? "Cập nhật" : "Xuất bản"
+                      )}
                     </Button>
                   </div>
                 </div>

@@ -27,6 +27,7 @@ const statusLabels: Record<string, string> = {
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingStatusIds, setUpdatingStatusIds] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,6 +59,7 @@ export default function AdminOrdersPage() {
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
+      setUpdatingStatusIds(prev => new Set(prev).add(orderId));
       const supabase = createClient();
       const { error } = await supabase
         .from("orders")
@@ -73,6 +75,12 @@ export default function AdminOrdersPage() {
     } catch (error) {
       console.error("Error updating order:", error);
       alert("Có lỗi xảy ra khi cập nhật trạng thái đơn hàng");
+    } finally {
+      setUpdatingStatusIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
     }
   };
 
@@ -313,7 +321,8 @@ export default function AdminOrdersPage() {
                       <select
                         value={order.status}
                         onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                        className={`px-3 py-1 rounded-lg text-xs font-semibold border-2 ${statusColors[order.status]} cursor-pointer focus:outline-none focus:ring-2`}
+                        disabled={updatingStatusIds.has(order.id)}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold border-2 ${statusColors[order.status]} cursor-pointer focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         {Object.entries(statusLabels).map(([value, label]) => (
                           <option key={value} value={value}>{label}</option>
@@ -384,7 +393,8 @@ export default function AdminOrdersPage() {
                     <select
                       value={selectedOrder.status}
                       onChange={(e) => updateOrderStatus(selectedOrder.id, e.target.value)}
-                      className={`w-full px-4 py-2 rounded-lg text-sm font-semibold border-2 ${statusColors[selectedOrder.status]} cursor-pointer focus:outline-none focus:ring-2`}
+                      disabled={updatingStatusIds.has(selectedOrder.id)}
+                      className={`w-full px-4 py-2 rounded-lg text-sm font-semibold border-2 ${statusColors[selectedOrder.status]} cursor-pointer focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       {Object.entries(statusLabels).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>

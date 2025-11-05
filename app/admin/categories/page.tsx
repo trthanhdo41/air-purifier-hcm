@@ -25,6 +25,9 @@ export default function CategoriesPage() {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
   const [formData, setFormData] = useState({
     id: "",
@@ -94,6 +97,7 @@ export default function CategoriesPage() {
     }
 
     try {
+      setIsCreating(true);
       const supabase = createClient();
       const slug = formData.slug || generateSlug(formData.name);
       const id = formData.id || slug;
@@ -125,6 +129,8 @@ export default function CategoriesPage() {
       setToast({ message: "Thêm danh mục thành công!", type: 'success' });
     } catch (error) {
       setToast({ message: 'Lỗi khi thêm danh mục', type: 'error' });
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -150,6 +156,7 @@ export default function CategoriesPage() {
     }
 
     try {
+      setIsUpdating(true);
       const supabase = createClient();
       const slug = formData.slug || generateSlug(formData.name);
 
@@ -179,6 +186,8 @@ export default function CategoriesPage() {
       setToast({ message: "Cập nhật danh mục thành công!", type: 'success' });
     } catch (error) {
       setToast({ message: 'Lỗi khi cập nhật danh mục', type: 'error' });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -186,6 +195,7 @@ export default function CategoriesPage() {
     if (!confirm(`Bạn có chắc muốn xóa danh mục này?`)) return;
 
     try {
+      setDeletingIds(prev => new Set(prev).add(categoryId));
       const supabase = createClient();
       const { error } = await supabase
         .from('categories')
@@ -201,6 +211,12 @@ export default function CategoriesPage() {
       setToast({ message: "Xóa danh mục thành công!", type: 'success' });
     } catch (error) {
       setToast({ message: 'Lỗi khi xóa danh mục', type: 'error' });
+    } finally {
+      setDeletingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(categoryId);
+        return newSet;
+      });
     }
   };
 
@@ -294,9 +310,15 @@ export default function CategoriesPage() {
                     </button>
                     <button
                       onClick={() => handleDeleteCategory(category.id)}
-                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      disabled={deletingIds.has(category.id)}
+                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Xóa"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {deletingIds.has(category.id) ? (
+                        <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -444,9 +466,17 @@ export default function CategoriesPage() {
                     </Button>
                     <Button
                       onClick={isEditMode ? handleUpdateCategory : handleCreateCategory}
-                      className="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white"
+                      disabled={isCreating || isUpdating}
+                      className="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isEditMode ? "Cập nhật" : "Thêm"}
+                      {(isCreating || isUpdating) ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          {isEditMode ? "Đang cập nhật..." : "Đang thêm..."}
+                        </>
+                      ) : (
+                        isEditMode ? "Cập nhật" : "Thêm"
+                      )}
                     </Button>
                   </div>
                 </div>
