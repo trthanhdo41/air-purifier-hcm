@@ -14,7 +14,7 @@ import rehypeSanitize from 'rehype-sanitize';
 type ViewType = 'welcome' | 'orders' | 'warranty' | 'chat';
 
 // TypeWriter component for typing animation (optimized for smooth performance)
-function TypeWriter({ text, speed = 15, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
+function TypeWriter({ text, speed = 8, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
   const animationRef = useRef<number | null>(null);
@@ -97,6 +97,7 @@ export default function Botchat() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [aiResponding, setAiResponding] = useState(false);
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
+  const [agentInfo, setAgentInfo] = useState<{ name: string; avatar: string | null; title: string } | null>(null);
   const shouldAutoScrollRef = useRef(true); // Track if we should auto scroll
   const isUserScrollingRef = useRef(false); // Track if user is manually scrolling
   const { user } = useAuthStore();
@@ -115,6 +116,39 @@ export default function Botchat() {
       }
     }
   }, [user, sessionId]);
+
+  // Fetch agent info from AI settings
+  useEffect(() => {
+    const fetchAgentInfo = async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('ai_settings')
+          .select('agent_name, agent_avatar, agent_title')
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching agent info:', error);
+          // Use default values
+          setAgentInfo({ name: 'Chị Lan', avatar: null, title: 'Tư vấn viên' });
+        } else if (data) {
+          setAgentInfo({
+            name: data.agent_name || 'Chị Lan',
+            avatar: data.agent_avatar || null,
+            title: data.agent_title || 'Tư vấn viên'
+          });
+        } else {
+          // No settings found, use defaults
+          setAgentInfo({ name: 'Chị Lan', avatar: null, title: 'Tư vấn viên' });
+        }
+      } catch (err) {
+        console.error('Error fetching agent info:', err);
+        setAgentInfo({ name: 'Chị Lan', avatar: null, title: 'Tư vấn viên' });
+      }
+    };
+
+    fetchAgentInfo();
+  }, []);
 
   const fetchOrders = async () => {
     if (!user) return;
@@ -385,7 +419,7 @@ export default function Botchat() {
               setTimeout(() => {
                 shouldAutoScrollRef.current = false;
               }, 200);
-            }, aiData.message.length * 15 + 500);
+            }, aiData.message.length * 8 + 500);
           }
         } else if (aiData.shouldWaitForAgent) {
           // AI is disabled or offline, wait for agent
@@ -636,15 +670,45 @@ export default function Botchat() {
                       chatMessages.map((msg) => (
                         <div
                           key={msg.id}
-                          className={`flex ${msg.is_from_user ? 'justify-end' : 'justify-start'}`}
+                          className={`flex items-start gap-2 ${msg.is_from_user ? 'justify-end' : 'justify-start'}`}
                         >
-                          <div
-                            className={`max-w-[80%] rounded-lg p-3 ${
-                              msg.is_from_user
-                                ? 'bg-sky-500 text-white rounded-tr-none'
-                                : 'bg-gray-200 text-gray-900 rounded-tl-none'
-                            }`}
-                          >
+                          {/* Avatar for AI/Admin messages */}
+                          {!msg.is_from_user && (
+                            <div className="flex-shrink-0">
+                              {agentInfo?.avatar ? (
+                                <img
+                                  src={agentInfo.avatar}
+                                  alt={agentInfo.name}
+                                  className="w-8 h-8 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center">
+                                  <Bot className="w-4 h-4 text-sky-600" />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div className="flex flex-col max-w-[80%]">
+                            {/* Name for AI/Admin messages */}
+                            {!msg.is_from_user && agentInfo && (
+                              <div className="flex items-center gap-1 mb-1">
+                                <span className="text-xs font-semibold text-gray-700">
+                                  {agentInfo.name}
+                                </span>
+                                {agentInfo.title && (
+                                  <span className="text-xs text-gray-500">
+                                    • {agentInfo.title}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            <div
+                              className={`rounded-lg p-3 ${
+                                msg.is_from_user
+                                  ? 'bg-sky-500 text-white rounded-tr-none'
+                                  : 'bg-gray-200 text-gray-900 rounded-tl-none'
+                              }`}
+                            >
                             {msg.is_from_user ? (
                               // User message - plain text
                               <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
@@ -656,7 +720,7 @@ export default function Botchat() {
                                   <div className="whitespace-pre-wrap">
                                     <TypeWriter 
                                       text={msg.message} 
-                                      speed={15}
+                                      speed={8}
                                       onComplete={() => {
                                         // After typing completes, switch to markdown rendering
                                         setTimeout(() => {
@@ -697,7 +761,8 @@ export default function Botchat() {
                                 )}
                               </div>
                             )}
-                            <p className={`text-xs mt-1 ${msg.is_from_user ? 'text-sky-100' : 'text-gray-500'}`}>
+                            </div>
+                            <p className={`text-xs mt-1 ${msg.is_from_user ? 'text-sky-100 text-right' : 'text-gray-500'}`}>
                               {new Date(msg.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                             </p>
                           </div>
