@@ -67,9 +67,12 @@ export async function POST(request: NextRequest) {
 
     // Tìm order theo order_number
     // Thử tìm theo nhiều biến thể của mã đơn để tránh sai khác dấu gạch
+    // Đồng bộ logic với check API để đảm bảo matching chính xác
     const rawInput = typeof extracted === 'string' ? extracted : extracted?.short || extracted?.full || '';
     const variants = Array.from(new Set([
       orderCode,
+      extractedString.trim(),
+      extractedString.trim().replace(/\s+/g, ''),
       rawInput.trim(),
       rawInput.trim().replace(/\s+/g, ''),
       orderCode.replace(/-/g, ''),
@@ -131,7 +134,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (!order) {
-      // Fallback 3: tìm "chứa" mã đơn
+      // Fallback 3: tìm "chứa" mã đơn (đồng bộ với check API)
+      console.log('🔍 Fallback: trying ilike contains:', orderCode);
       const { data: likeOrders, error: likeErr } = await supabase
         .from('orders')
         .select('id, order_number, total_amount, final_amount, payment_status, created_at')
@@ -139,6 +143,7 @@ export async function POST(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(1);
       if (!likeErr && Array.isArray(likeOrders) && likeOrders.length > 0) {
+        console.log('✅ Found order via ilike fallback:', { order_number: likeOrders[0].order_number, payment_status: likeOrders[0].payment_status });
         order = likeOrders[0] as any;
       }
     }
@@ -280,44 +285,11 @@ function extractOrderCode(content: string): any | null {
 }
 
 // Allow GET request để test webhook endpoint
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const testOrderCode = searchParams.get('testOrderCode');
-  
-  if (testOrderCode) {
-    // Test webhook với payload giống SEPay
-    const testPayload = {
-      gateway: "VPBank",
-      transactionDate: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      accountNumber: "0888889805",
-      subAccount: null,
-      code: null,
-      content: `NHAN TU 701888888 TRACE 285093 ND 106330722528-0888889805-${testOrderCode}`,
-      transferType: "in",
-      description: `BankAPINotify NHAN TU 701888888 TRACE 285093 ND 106330722528-0888889805-${testOrderCode}`,
-      transferAmount: 10000,
-      referenceCode: `FT${Date.now()}`,
-      accumulated: 0,
-      id: Math.floor(Math.random() * 100000000),
-    };
-    
-    // Gọi POST handler với test payload
-    const testRequest = new NextRequest(request.url, {
-      method: 'POST',
-      body: JSON.stringify(testPayload),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    return POST(testRequest);
-  }
-  
+export async function GET() {
   return NextResponse.json({
     message: 'Sepay Webhook Endpoint',
     status: 'active',
     timestamp: new Date().toISOString(),
-    test: 'Add ?testOrderCode=HTX##### to test webhook',
   });
 }
 
