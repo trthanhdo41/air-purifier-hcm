@@ -17,6 +17,7 @@ import LoginModal from "@/components/LoginModal";
 import AddressSelector from "@/components/AddressSelector";
 import { useProvinces } from "@/lib/hooks/useProvinces";
 import PaymentProcessing from "@/components/PaymentProcessing";
+import SepayQRPayment from "@/components/SepayQRPayment";
 
 export default function CheckoutPage() {
   const { items, buyNowItems, getTotalItems, getTotalPrice, getTotalSavings, clearBuyNowItems } = useCartStore();
@@ -26,6 +27,8 @@ export default function CheckoutPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [showSepayQR, setShowSepayQR] = useState(false);
+  const [sepayQRData, setSepayQRData] = useState<any>(null);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -211,11 +214,36 @@ export default function CheckoutPage() {
         return;
       }
 
-            // Handle payment method - Redirect to dedicated payment page
+            // Handle payment method
     if (formData.paymentMethod === 'sepay') {
-      const orderCode = orderData.order.order_number;
-      router.push(`/payment/${orderCode}`);
-      return;
+      try {
+                const orderCode = orderData.order.order_number;
+                const res = await fetch(`/api/payment/sepay/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    amount: finalAmount, 
+                    orderCode, 
+                    description: `Thanh toan don hang ${orderCode}`,
+                    orderId: orderData.order.id,
+                  }),
+        });
+        const data = await res.json();
+                
+                if (data?.success && data?.qrData) {
+                  // Hiển thị QR code modal ngay lập tức
+                  setSepayQRData(data.qrData);
+                  setShowSepayQR(true);
+          return;
+        }
+                
+                alert('Không thể tạo thanh toán. Vui lòng thử lại hoặc chọn phương thức khác.');
+        return;
+      } catch (err) {
+                console.error('Sepay error:', err);
+                alert('Có lỗi xảy ra khi tạo thanh toán. Vui lòng thử lại.');
+        return;
+      }
     }
 
             // For COD, clear cart and redirect to success page
@@ -632,6 +660,29 @@ export default function CheckoutPage() {
       
       {/* Login Modal */}
       <LoginModal isOpen={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
+      
+      {/* Payment Processing Modal */}
+      {/* Sepay QR Payment Modal */}
+      {showSepayQR && sepayQRData && (
+        <SepayQRPayment
+          orderCode={sepayQRData.orderCode}
+          amount={sepayQRData.amount}
+          bankAccount={sepayQRData.bankAccount}
+          bankName={sepayQRData.bankName}
+          onSuccess={() => {
+            setShowSepayQR(false);
+            // Clear cart after successful payment
+            if (buyNowItems.length > 0) {
+              clearBuyNowItems();
+            }
+            router.push(`/success?order=${sepayQRData.orderCode}`);
+          }}
+          onCancel={() => {
+            setShowSepayQR(false);
+            setSepayQRData(null);
+          }}
+        />
+      )}
     </div>
   );
 }
