@@ -56,11 +56,13 @@ export default function SepayQRPayment({
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  // Check payment status every 3 seconds (faster polling)
+  // Check payment status every 5 seconds
+  // Gọi API /api/payment/sepay/check để check cột payment_status từ Supabase
   useEffect(() => {
     let isMounted = true;
     let retryCount = 0;
-    const maxRetries = 200; // 200 * 3s = 10 phút max
+    const maxRetries = 120; // 120 * 5s = 10 phút max
+    const POLL_INTERVAL = 5000; // 5 giây
 
     const checkPayment = async () => {
       if (!isMounted) return;
@@ -75,6 +77,7 @@ export default function SepayQRPayment({
         setCheckingPayment(true);
         // Add timestamp to prevent caching
         const timestamp = Date.now();
+        // Gọi API check để lấy payment_status từ Supabase
         const res = await fetch(`/api/payment/sepay/check?orderCode=${orderCode}&t=${timestamp}`, {
           cache: 'no-store',
           headers: {
@@ -93,14 +96,21 @@ export default function SepayQRPayment({
         console.log('💳 Payment check result:', {
           success: data.success,
           isPaid: data.isPaid,
-          order: data.order ? { order_number: data.order.order_number, payment_status: data.order.payment_status } : null,
+          payment_status: data.order?.payment_status || 'unknown',
+          order: data.order ? { 
+            order_number: data.order.order_number, 
+            payment_status: data.order.payment_status,
+            status: data.order.status,
+          } : null,
           retryCount,
         });
         
-        if (data.success && data.isPaid && data.order) {
+        // Kiểm tra payment_status từ Supabase: nếu là 'paid' thì redirect
+        if (data.success && data.isPaid && data.order && data.order.payment_status === 'paid') {
           console.log('✅ Payment confirmed! Redirecting...', {
             order_number: data.order.order_number,
             payment_status: data.order.payment_status,
+            status: data.order.status,
           });
           // Stop polling
           isMounted = false;
@@ -119,8 +129,8 @@ export default function SepayQRPayment({
     // Check immediately on mount
     checkPayment();
     
-    // Then check every 3 seconds
-    const interval = setInterval(checkPayment, 3000);
+    // Then check every 5 seconds
+    const interval = setInterval(checkPayment, POLL_INTERVAL);
     
     return () => {
       isMounted = false;
