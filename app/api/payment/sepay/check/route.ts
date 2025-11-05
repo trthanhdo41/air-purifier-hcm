@@ -31,13 +31,21 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createAdminClient();
+    
+    // Log Supabase URL để confirm đang connect đúng project
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    console.log('🔌 Check API - Connected to Supabase:', supabaseUrl);
 
     // QUERY GIỐNG HỆT ADMIN PAGE - Query tất cả orders rồi filter (như admin page)
     // Admin page: supabase.from("orders").select("*").order("created_at", { ascending: false })
     // Check API: Query tất cả orders, sau đó filter theo order_number (giống admin page filter)
     const orderNumber = rawCode.trim();
     
-    console.log('🔍 Check API - Querying ALL orders (like admin page):', { orderNumber });
+    console.log('🔍 Check API - Querying ALL orders (like admin page):', { 
+      orderNumber,
+      table: 'orders',
+      supabaseUrl: supabaseUrl?.substring(0, 30) + '...' // Chỉ log 30 ký tự đầu
+    });
 
     // Query TẤT CẢ orders (giống hệt admin page)
     const { data: allOrders, error } = await supabase
