@@ -25,6 +25,7 @@ export default function SepayQRPayment({
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState(600); // 10 phút
   const [checkingPayment, setCheckingPayment] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState('');
 
   // QR Code URL
   const qrCodeUrl = `https://qr.sepay.vn/img?acc=${bankAccount}&bank=${bankName}&amount=${amount}&des=${orderCode}`;
@@ -56,100 +57,77 @@ export default function SepayQRPayment({
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  // Check payment status every 5 seconds
-  // Gọi API /api/payment/sepay/check để check cột payment_status từ Supabase
-  useEffect(() => {
-    let isMounted = true;
-    let retryCount = 0;
-    const maxRetries = 120; // 120 * 5s = 10 phút max
-    const POLL_INTERVAL = 5000; // 5 giây
-
-    const checkPayment = async () => {
-      if (!isMounted) return;
+  // Handler check payment khi user click nút "Đã thanh toán"
+  // CHECK GIỐNG HỆT ADMIN PAGE - Query Supabase để lấy payment_status
+  const handleCheckPayment = async () => {
+    try {
+      setCheckingPayment(true);
+      setPaymentMessage('');
       
-      retryCount++;
-      if (retryCount > maxRetries) {
-        console.warn('⚠️ Payment check timeout after 10 minutes');
+      const timestamp = Date.now();
+      // Gọi API check để lấy payment_status từ Supabase (giống admin page)
+      const res = await fetch(`/api/payment/sepay/check?orderCode=${orderCode}&t=${timestamp}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
+      
+      if (!res.ok) {
+        console.error('❌ Payment check failed:', res.status, res.statusText);
+        setPaymentMessage('❌ Không thể kiểm tra thanh toán. Vui lòng thử lại.');
         return;
       }
 
-      try {
-        setCheckingPayment(true);
-        // Add timestamp to prevent caching
-        const timestamp = Date.now();
-        // Gọi API check để lấy payment_status từ Supabase
-        const res = await fetch(`/api/payment/sepay/check?orderCode=${orderCode}&t=${timestamp}`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-          },
-        });
-        
-        if (!res.ok) {
-          console.error('❌ Payment check failed:', res.status, res.statusText);
-          return;
-        }
-
-        const data = await res.json();
-        
-        // CHECK GIỐNG HỆT ADMIN PAGE - Check trực tiếp payment_status === 'paid'
-        // Admin page: order.payment_status === 'paid' ? 'Đã thanh toán' : 'Chờ thanh toán'
-        // Checkout FE: payment_status === 'paid' ? redirect : continue polling
-        const paymentStatus = data.payment_status || data.order?.payment_status;
-        const isPaid = paymentStatus === 'paid';
-        
-        console.log('💳 Payment check result (like admin page):', {
-          success: data.success,
+      const data = await res.json();
+      
+      // CHECK GIỐNG HỆT ADMIN PAGE - Check trực tiếp payment_status === 'paid'
+      // Admin page: order.payment_status === 'paid' ? 'Đã thanh toán' : 'Chờ thanh toán'
+      // Checkout FE: payment_status === 'paid' ? redirect : continue polling
+      const paymentStatus = data.payment_status || data.order?.payment_status;
+      const isPaid = paymentStatus === 'paid';
+      
+      console.log('💳 Payment check result (like admin page):', {
+        success: data.success,
+        payment_status: paymentStatus,
+        payment_status_from_response: data.payment_status,
+        payment_status_from_order: data.order?.payment_status,
+        isPaid: isPaid,
+        order: data.order ? { 
+          order_number: data.order.order_number, 
+          payment_status: data.order.payment_status,
+          status: data.order.status,
+          id: data.order.id,
+        } : null,
+      });
+      
+      // CHECK GIỐNG HỆT ADMIN PAGE - Nếu payment_status === 'paid' thì redirect
+      // Admin page check: order.payment_status === 'paid' → hiển thị "Đã thanh toán"
+      // Checkout FE check: payment_status === 'paid' → redirect đến /success
+      if (data.success && isPaid && paymentStatus === 'paid') {
+        console.log('✅ Payment confirmed! Redirecting...', {
+          order_number: data.order?.order_number,
           payment_status: paymentStatus,
-          payment_status_from_response: data.payment_status,
-          payment_status_from_order: data.order?.payment_status,
-          isPaid: isPaid,
-          order: data.order ? { 
-            order_number: data.order.order_number, 
-            payment_status: data.order.payment_status,
-            status: data.order.status,
-            id: data.order.id,
-          } : null,
-          retryCount,
+          status: data.order?.status,
+          order_id: data.order?.id,
         });
-        
-        // CHECK GIỐNG HỆT ADMIN PAGE - Nếu payment_status === 'paid' thì redirect
-        // Admin page check: order.payment_status === 'paid' → hiển thị "Đã thanh toán"
-        // Checkout FE check: payment_status === 'paid' → redirect đến /success
-        if (data.success && isPaid && paymentStatus === 'paid') {
-          console.log('✅ Payment confirmed! Redirecting...', {
-            order_number: data.order?.order_number,
-            payment_status: paymentStatus,
-            status: data.order?.status,
-            order_id: data.order?.id,
-          });
-          // Stop polling
-          isMounted = false;
-          // Call onSuccess to redirect
+        setPaymentMessage('✅ Thanh toán thành công! Đang chuyển trang...');
+        // Call onSuccess to redirect
+        setTimeout(() => {
           onSuccess?.();
-          return; // Stop execution
-        }
-      } catch (error) {
-        console.error('❌ Error checking payment:', error);
-      } finally {
-        if (isMounted) {
-          setCheckingPayment(false);
-        }
+        }, 500);
+      } else {
+        // Chưa thanh toán
+        setPaymentMessage('⏳ Chưa nhận được thanh toán. Vui lòng kiểm tra lại sau khi chuyển khoản.');
       }
-    };
-
-    // Check immediately on mount
-    checkPayment();
-    
-    // Then check every 5 seconds
-    const interval = setInterval(checkPayment, POLL_INTERVAL);
-    
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [orderCode, onSuccess]);
+    } catch (error) {
+      console.error('❌ Error checking payment:', error);
+      setPaymentMessage('❌ Có lỗi xảy ra. Vui lòng thử lại.');
+    } finally {
+      setCheckingPayment(false);
+    }
+  };
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
@@ -221,10 +199,41 @@ export default function SepayQRPayment({
                 <p className="text-sm font-medium">Quét mã QR bằng ứng dụng ngân hàng</p>
               </div>
 
-              <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-4 py-2 rounded-lg">
-                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                <span className="text-sm font-medium">Đang tự động kiểm tra thanh toán mỗi 5 giây...</span>
-              </div>
+              {/* Nút "Đã thanh toán" - Check giống admin page */}
+              <button
+                onClick={handleCheckPayment}
+                disabled={checkingPayment}
+                className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold px-6 py-3 rounded-lg transition-colors w-full max-w-md"
+              >
+                {checkingPayment ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Đang kiểm tra...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>Đã thanh toán</span>
+                  </>
+                )}
+              </button>
+
+              {/* Hiển thị thông báo */}
+              {paymentMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                    paymentMessage.startsWith('✅') 
+                      ? 'bg-green-50 text-green-700' 
+                      : paymentMessage.startsWith('⏳')
+                      ? 'bg-yellow-50 text-yellow-700'
+                      : 'bg-red-50 text-red-700'
+                  }`}
+                >
+                  {paymentMessage}
+                </motion.div>
+              )}
             </div>
 
             {/* Thông tin chuyển khoản */}
