@@ -42,10 +42,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Chuẩn hóa mã đơn về HTX-<digits>-<CODE> nếu có thể
-    const orderCode = normalizeOrderCode(typeof extracted === 'string' ? extracted : extracted?.full || extracted?.short || '');
+    const extractedString = typeof extracted === 'string' ? extracted : extracted?.full || extracted?.short || '';
+    const orderCode = normalizeOrderCode(extractedString);
     const prefixDigits = typeof extracted === 'string' ? null : (extracted?.prefixDigits ?? null);
     const suffixToken = typeof extracted === 'string' ? null : (extracted?.suffixToken ?? null);
-    console.log('✅ Order code extracted:', { raw: extracted, normalized: orderCode, prefixDigits, suffixToken });
+    console.log('✅ Order code extracted:', { 
+      raw: extracted, 
+      extractedString, 
+      normalized: orderCode, 
+      prefixDigits, 
+      suffixToken,
+      content: payload.content,
+      description: payload.description
+    });
 
     // Chỉ xử lý giao dịch TIỀN VÀO
     if (payload.transferType && payload.transferType !== 'in') {
@@ -65,6 +74,8 @@ export async function POST(request: NextRequest) {
       orderCode.replace(/-/g, '—'),
     ]));
 
+    console.log('🔍 Searching order with variants:', variants);
+
     let { data: foundOrders, error: findError } = await supabase
       .from('orders')
       .select('id, order_number, total_amount, final_amount, payment_status, created_at')
@@ -72,6 +83,8 @@ export async function POST(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(1);
     let order = Array.isArray(foundOrders) && foundOrders.length > 0 ? (foundOrders[0] as any) : null;
+
+    console.log('🔍 First search result:', { foundCount: foundOrders?.length || 0, order: order ? { id: order.id, order_number: order.order_number, payment_status: order.payment_status } : null, error: findError?.message });
 
     if (findError || !order) {
       // Thử tìm theo biến thể không dấu (nếu đơn lưu sai format)
@@ -132,6 +145,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'Order lookup resulted in null' });
     }
 
+    console.log('✅ Order found:', { order_id: order.id, order_number: order.order_number, current_payment_status: order.payment_status });
+
     // Kiểm tra đơn hàng đã được thanh toán chưa (tránh duplicate)
     if (order.payment_status === 'paid') {
       console.log('✅ Order already paid:', orderCode);
@@ -158,6 +173,8 @@ export async function POST(request: NextRequest) {
       payload.trans_id ||
       `SEPAY-${Date.now()}`;
 
+    console.log('🔄 Updating order:', { order_id: order.id, order_number: order.order_number, from_status: order.payment_status, to_status: 'paid' });
+
     const { error: updateError } = await supabase
       .from('orders')
       .update({
@@ -171,15 +188,26 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       console.error('❌ Error updating order:', updateError);
       return NextResponse.json(
-        { success: false, error: 'Failed to update order' },
+        { success: false, error: 'Failed to update order', details: updateError.message },
         { status: 500 }
       );
     }
 
+    // Verify update was successful
+    const { data: verifyOrder, error: verifyError } = await supabase
+      .from('orders')
+      .select('payment_status, status')
+      .eq('id', order.id)
+      .single();
+
     console.log('✅ Order updated successfully:', {
       orderCode,
-      transactionId: payload.transaction_id,
-      amount: payload.amount,
+      order_id: order.id,
+      order_number: order.order_number,
+      transactionId: payload.transaction_id || payload.id,
+      amount: payload.amount || payload.transferAmount,
+      verified_status: verifyOrder?.payment_status,
+      verify_error: verifyError?.message,
     });
 
     // TODO: Gửi email xác nhận thanh toán cho khách hàng
