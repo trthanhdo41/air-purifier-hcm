@@ -184,6 +184,11 @@ export default function AdminDashboardPage() {
                 duration: 2000,
                 easing: 'easeOutCubic',
               },
+              rotation: {
+                from: 0,
+                duration: 2000,
+                easing: 'easeOutCubic',
+              },
             },
           },
         ],
@@ -432,22 +437,31 @@ export default function AdminDashboardPage() {
                     display: true,
                     position: 'top' as const,
                   },
-                  tooltip: {
-                    enabled: true,
-                    mode: 'index',
-                    intersect: false,
-                    position: 'nearest' as any,
-                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                    padding: 12,
-                    titleFont: { size: 14, weight: 'bold' },
-                    bodyFont: { size: 13 },
-                    displayColors: false,
-                    callbacks: {
-                      label: function(context: any) {
-                        return `Doanh thu: ${new Intl.NumberFormat('vi-VN').format(context.parsed.y)}đ`;
+                    tooltip: {
+                      enabled: true,
+                      mode: 'index',
+                      intersect: false,
+                      position: function(context: any) {
+                        // Custom position để tooltip hiển thị đúng vị trí chuột
+                        const point = context[0];
+                        const x = point.element.x;
+                        const y = point.element.y;
+                        return {
+                          x: x,
+                          y: y - 20, // Offset lên trên một chút
+                        };
+                      },
+                      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                      padding: 12,
+                      titleFont: { size: 14, weight: 'bold' },
+                      bodyFont: { size: 13 },
+                      displayColors: false,
+                      callbacks: {
+                        label: function(context: any) {
+                          return `Doanh thu: ${new Intl.NumberFormat('vi-VN').format(context.parsed.y)}đ`;
+                        },
                       },
                     },
-                  },
                 },
                   scales: {
                     y: {
@@ -556,6 +570,14 @@ export default function AdminDashboardPage() {
                     animateScale: true,
                     duration: 2000,
                     easing: 'easeOutCubic' as any,
+                    onProgress: function(animation: any) {
+                      // Force animation from 0
+                      if (animation.currentStep === 0) {
+                        animation.chart.data.datasets.forEach((dataset: any, index: number) => {
+                          if (!dataset._meta) dataset._meta = {};
+                        });
+                      }
+                    },
                   },
                   animations: {
                     scale: {
@@ -576,7 +598,16 @@ export default function AdminDashboardPage() {
                     },
                     tooltip: {
                       enabled: true,
-                      position: 'nearest' as any,
+                      position: function(context: any) {
+                        // Custom position để tooltip hiển thị đúng vị trí chuột
+                        const point = context[0];
+                        const x = point.element.x;
+                        const y = point.element.y;
+                        return {
+                          x: x,
+                          y: y - 20, // Offset lên trên một chút
+                        };
+                      },
                       backgroundColor: 'rgba(0, 0, 0, 0.85)',
                       padding: 12,
                       titleFont: { size: 14, weight: 'bold' },
@@ -631,7 +662,16 @@ export default function AdminDashboardPage() {
                       enabled: true,
                       mode: 'index',
                       intersect: true,
-                      position: 'nearest' as any,
+                      position: function(context: any) {
+                        // Custom position để tooltip hiển thị đúng vị trí chuột
+                        const point = context[0];
+                        const x = point.element.x;
+                        const y = point.element.y;
+                        return {
+                          x: x,
+                          y: y - 20, // Offset lên trên một chút
+                        };
+                      },
                       backgroundColor: 'rgba(0, 0, 0, 0.85)',
                       padding: 12,
                       titleFont: { size: 14, weight: 'bold' },
