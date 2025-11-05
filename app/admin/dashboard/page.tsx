@@ -199,15 +199,24 @@ export default function AdminDashboardPage() {
         users = usersData.users || [];
       }
 
-      const [productsResult, ordersResult, unansweredQs, answeredQs] = await Promise.all([
+      const [productsResult, ordersResult, orderItemsResult, unansweredQs, answeredQs] = await Promise.all([
         supabase.from('products').select('id').eq('status', 'active'),
         supabase.from('orders').select('*'),
+        supabase.from('order_items').select(`
+          product_id,
+          quantity,
+          products (
+            id,
+            name
+          )
+        `),
         supabase.from('questions').select('id,name,content,created_at').is('answered_at', null).order('created_at', { ascending: false }).limit(5),
         supabase.from('questions').select('id,name,content,answered_at').not('answered_at', 'is', null).order('answered_at', { ascending: false }).limit(5),
       ]);
 
       const products = productsResult.data || [];
       const orders = ordersResult.data || [];
+      const orderItems = orderItemsResult.data || [];
 
       const totalRevenue = orders
         .filter((o: any) => o.status === 'delivered')
@@ -242,7 +251,7 @@ export default function AdminDashboardPage() {
       // Prepare chart data (chỉ gọi 1 lần khi có data)
       // Chỉ prepare khi orders có data và chartData chưa có
       if (orders.length > 0 && !chartData) {
-        prepareChartData(orders, orderItems || []);
+        prepareChartData(orders, orderItems);
       } else if (orders.length === 0) {
         setChartData(null);
       }
@@ -368,30 +377,26 @@ export default function AdminDashboardPage() {
             <div style={{ height: '250px', position: 'relative' }}>
               <Line
                 data={chartData.revenueChart}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  animation: false, // Hoàn toàn disable animation
-                  transitions: {
-                    active: {
-                      animation: {
-                        duration: 0,
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                  duration: 1000, // Animation 1 giây khi vào trang
+                  easing: 'easeOutQuart',
+                },
+                plugins: {
+                  legend: {
+                    display: true,
+                    position: 'top' as const,
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context: any) {
+                        return `Doanh thu: ${new Intl.NumberFormat('vi-VN').format(context.parsed.y)}đ`;
                       },
                     },
                   },
-                  plugins: {
-                    legend: {
-                      display: true,
-                      position: 'top' as const,
-                    },
-                    tooltip: {
-                      callbacks: {
-                        label: function(context: any) {
-                          return `Doanh thu: ${new Intl.NumberFormat('vi-VN').format(context.parsed.y)}đ`;
-                        },
-                      },
-                    },
-                  },
+                },
                   scales: {
                     y: {
                       beginAtZero: true,
