@@ -46,62 +46,64 @@ export async function GET(request: NextRequest) {
 
     console.log('🔍 Check API - Searching order with variants:', { rawCode, normalized, variants });
 
-    // Tìm order theo order_number với retry logic để đảm bảo đọc dữ liệu mới nhất
+    // ĐỒNG BỘ LOGIC MATCHING VỚI WEBHOOK - Tìm order theo order_number
     let order = null;
-    let retryCount = 0;
-    const maxRetries = 3;
     
-    while (retryCount < maxRetries && !order) {
-      // Thêm delay nhỏ để đảm bảo đọc dữ liệu mới nhất (read consistency)
-      if (retryCount > 0) {
-        await new Promise(resolve => setTimeout(resolve, 200 * retryCount));
-      }
+    // Strategy 1: Tìm bằng variants (giống webhook)
+    let { data: foundOrders, error: findError } = await supabase
+      .from('orders')
+      .select('*')
+      .in('order_number', variants)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    order = Array.isArray(foundOrders) && foundOrders.length > 0 ? foundOrders[0] : null;
 
-      const { data: orders, error } = await supabase
+    console.log('🔍 Check API - First search result:', { 
+      foundCount: foundOrders?.length || 0, 
+      order: order ? { 
+        id: order.id, 
+        order_number: order.order_number, 
+        payment_status: order.payment_status 
+      } : null, 
+      error: findError?.message 
+    });
+
+    // Strategy 2: Thử tìm theo biến thể không dấu (giống webhook)
+    if (findError || !order) {
+      const noDashVariant = normalized.replace(/-/g, '');
+      console.log('🔍 Check API - Trying noDashVariant:', noDashVariant);
+      const retry = await supabase
         .from('orders')
         .select('*')
-        .in('order_number', variants)
+        .in('order_number', [noDashVariant, noDashVariant.replace(/-/g, '–'), noDashVariant.replace(/-/g, '—')])
         .order('created_at', { ascending: false })
         .limit(1);
 
-      order = Array.isArray(orders) && orders.length > 0 ? orders[0] : null;
-
-      if (error) {
-        console.error(`❌ Check API - Error finding order (retry ${retryCount + 1}/${maxRetries}):`, error.message);
-      } else if (order) {
-        console.log(`✅ Check API - Order found (retry ${retryCount + 1}/${maxRetries}):`, {
+      if (!retry.error && Array.isArray(retry.data) && retry.data.length > 0) {
+        order = retry.data[0];
+        console.log('✅ Check API - Order found via noDashVariant:', {
           order_number: order.order_number,
           payment_status: order.payment_status,
-          status: order.status,
-          id: order.id,
         });
-        break; // Tìm thấy order, thoát khỏi loop
       }
-
-      retryCount++;
     }
 
-    // Nếu không tìm thấy bằng variants, thử fallback với ilike
+    // Strategy 3: Fallback - tìm "chứa" mã đơn (giống webhook)
     if (!order) {
-      console.log('❌ Check API - Order not found by variants, trying ilike fallback:', { rawCode, normalized, variants });
-      const { data: fuzzyOrders, error: fuzzyErr } = await supabase
+      console.log('🔍 Check API - Fallback: trying ilike contains:', normalized);
+      const { data: likeOrders, error: likeErr } = await supabase
         .from('orders')
         .select('*')
         .ilike('order_number', `%${normalized}%`)
         .order('created_at', { ascending: false })
         .limit(1);
       
-      const fuzzy = Array.isArray(fuzzyOrders) && fuzzyOrders.length > 0 ? fuzzyOrders[0] : null;
-      
-      if (fuzzyErr) {
-        console.error('❌ Check API - Error with ilike fallback:', fuzzyErr.message);
-      } else if (fuzzy) {
-        console.log('✅ Check API - Order found via ilike fallback:', {
-          order_number: fuzzy.order_number,
-          payment_status: fuzzy.payment_status,
-          status: fuzzy.status,
+      if (!likeErr && Array.isArray(likeOrders) && likeOrders.length > 0) {
+        console.log('✅ Check API - Order found via ilike fallback:', { 
+          order_number: likeOrders[0].order_number, 
+          payment_status: likeOrders[0].payment_status 
         });
-        order = fuzzy;
+        order = likeOrders[0];
       }
     }
 
