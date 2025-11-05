@@ -180,6 +180,9 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Set loading state ngay sau khi validation
+    setIsProcessingPayment(true);
+
     try {
       // Save order to database first
       const shippingFee = 0; // You can calculate this based on location
@@ -211,6 +214,7 @@ export default function CheckoutPage() {
 
       if (!createOrderRes.ok || !orderData.success) {
         alert(orderData.error || 'Có lỗi xảy ra khi tạo đơn hàng. Vui lòng thử lại.');
+        setIsProcessingPayment(false);
         return;
       }
 
@@ -234,14 +238,17 @@ export default function CheckoutPage() {
                   // Hiển thị QR code modal ngay lập tức
                   setSepayQRData(data.qrData);
                   setShowSepayQR(true);
+                  // Không reset loading vì popup sẽ hiện
           return;
         }
                 
                 alert('Không thể tạo thanh toán. Vui lòng thử lại hoặc chọn phương thức khác.');
+                setIsProcessingPayment(false);
         return;
       } catch (err) {
                 console.error('Sepay error:', err);
                 alert('Có lỗi xảy ra khi tạo thanh toán. Vui lòng thử lại.');
+                setIsProcessingPayment(false);
         return;
       }
     }
@@ -250,10 +257,12 @@ export default function CheckoutPage() {
             if (buyNowItems.length > 0) {
               clearBuyNowItems();
             }
+            // Không reset loading vì sẽ redirect ngay
             router.push(`/success?order=${orderData.order.order_number}`);
     } catch (error: any) {
       console.error('Error submitting order:', error);
       alert('Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.');
+      setIsProcessingPayment(false);
     }
   };
 
