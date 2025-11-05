@@ -223,7 +223,28 @@ VẤN ĐỀ 2: Đơn hàng không tự động cập nhật
 ├─ Check webhook có được gọi không (Sepay logs)
 ├─ Check response webhook có 200 OK không
 ├─ Verify database connection (Supabase)
-└─ Check RLS policies cho orders table
+├─ Check RLS policies cho orders table
+└─ **FIX ĐÃ VERIFY:** Dùng direct query với .eq() và .single()
+
+VẤN ĐỀ 5: Frontend không detect được payment status 'paid'
+├─ Admin page thấy 'paid' nhưng check API trả về 'pending'
+├─ **NGUYÊN NHÂN:** Query logic phức tạp, có thể read consistency issue
+├─ **SOLUTION:**
+│  1. Tạo script test local: scripts/test-find-order.js
+│  2. Verify query logic với SERVICE_ROLE_KEY
+│  3. Dùng direct query: .eq('order_number', code).single()
+│  4. Return NGAY khi tìm thấy (early return)
+└─ **KẾT QUẢ:** ✅ Hoạt động 100%
+
+VẤN ĐỀ 6: Vercel build failed - Dependency conflicts
+├─ React 19 conflict với Next.js 15.0.3
+├─ Missing dependencies: class-variance-authority, clsx, tailwind-merge
+├─ Next.js 15 breaking change: params là Promise
+└─ **SOLUTION:**
+   1. Tạo .npmrc với legacy-peer-deps=true
+   2. npm install class-variance-authority clsx tailwind-merge
+   3. Fix params type: params: Promise<{ slug: string }>
+   4. Await params: const { slug } = await params
 
 VẤN ĐỀ 3: Không redirect được về trang Sepay
 ├─ Kiểm tra SEPAY_API_KEY đúng chưa
@@ -271,6 +292,28 @@ Khi được yêu cầu setup Sepay cho dự án mới:
 4. Cấu hình Vercel env vars
 5. Deploy và test
 
+⚡ DEBUGGING PAYMENT KHÔNG HOẠT ĐỘNG:
+
+1. **TẠO TEST SCRIPT TRƯỚC:**
+   - Copy scripts/test-find-order.js
+   - Test với SERVICE_ROLE_KEY
+   - Verify query logic trước khi debug production
+
+2. **CHECK API LOGIC:**
+   - Dùng DIRECT QUERY: .eq('order_number', code).single()
+   - KHÔNG dùng logic phức tạp với .find() trên array
+   - Return NGAY khi tìm thấy (early return)
+
+3. **VERIFY DEPENDENCIES:**
+   - Tạo .npmrc với legacy-peer-deps=true
+   - Install: class-variance-authority, clsx, tailwind-merge
+   - Fix Next.js 15 params: Promise<{ slug: string }>
+
+4. **CHECK ENVIRONMENT:**
+   - Verify Supabase URL đúng project
+   - Verify SERVICE_ROLE_KEY có quyền
+   - Check Vercel logs để xem total_orders
+
 KHÔNG TẠO CÁC FILE .md HAY HƯỚNG DẪN DÀI DÒNG
 → Chỉ cần action trực tiếp và note lại trong file .txt này
 
@@ -278,13 +321,75 @@ KHÔNG TẠO CÁC FILE .md HAY HƯỚNG DẪN DÀI DÒNG
 📝 CHANGELOG
 ===========================================
 
+2025-11-05: ✅ THANH TOÁN THÀNH CÔNG - SOLUTION HOÀN CHỈNH
+---------------------------------------------------------
+VẤN ĐỀ ĐÃ GIẢI QUYẾT:
+- API không tìm thấy order dù order tồn tại trong Supabase
+- Frontend popup không detect được payment_status = 'paid'
+- Admin page thấy order nhưng check API không thấy
+
+NGUYÊN NHÂN:
+1. Query logic phức tạp với .find() trên array
+2. Có thể có vấn đề về read consistency
+3. Dependencies thiếu khi deploy Vercel
+4. Next.js 15 breaking changes
+
+SOLUTION ĐÃ ÁP DỤNG (HOẠT ĐỘNG 100%):
+
+1. **Test Script Local** (scripts/test-find-order.js)
+   - Tạo script test độc lập để verify logic
+   - Test với SERVICE_ROLE_KEY → ✅ Tìm thấy order
+   - Test với ANON_KEY → ❌ RLS blocking
+   - Kết luận: Logic đúng, cần dùng SERVICE_ROLE_KEY
+
+2. **Fix Check API** (app/api/payment/sepay/check/route.ts)
+   ```typescript
+   // DÙNG DIRECT QUERY - Verified working
+   const { data: directQuery, error: directError } = await supabase
+     .from('orders')
+     .select('*')
+     .eq('order_number', orderNumber)
+     .single(); // Use .single() thay vì .maybeSingle()
+   
+   // Return NGAY nếu tìm thấy
+   if (directQuery && !directError) {
+     return NextResponse.json({
+       success: true,
+       isPaid: directQuery.payment_status === 'paid',
+       order: directQuery,
+       payment_status: directQuery.payment_status,
+       method: 'direct_query',
+     });
+   }
+   ```
+
+3. **Fix Build Dependencies**
+   - Tạo `.npmrc` với `legacy-peer-deps=true`
+   - Install: class-variance-authority, clsx, tailwind-merge
+   - Fix Next.js 15: params → Promise<params>
+
+4. **Verify Environment Variables**
+   - NEXT_PUBLIC_SUPABASE_URL đúng
+   - SUPABASE_SERVICE_ROLE_KEY đúng
+   - SEPAY_BANK_ACCOUNT, SEPAY_BANK_NAME đúng
+
+KẾT QUẢ:
+✅ Webhook nhận tiền → Update payment_status = 'paid'
+✅ Frontend click "Đã thanh toán" → Detect được 'paid'
+✅ Redirect đến /success thành công
+✅ Admin page hiển thị "Đã thanh toán"
+
+FILES QUAN TRỌNG ĐÃ SỬA:
+- app/api/payment/sepay/check/route.ts (Direct query logic)
+- scripts/test-find-order.js (Test script)
+- .npmrc (Fix dependency conflicts)
+- package.json (Add missing dependencies)
+
 2025-01-04:
 - Initial setup cho hoithoxanh production
 - Webhook ID: 17017
 - API Key ID: 5175
 - Deploy domain: air-purifier-hcm.vercel.app
-
-[Ghi chú các lần cập nhật sau ở đây]
 
 ===========================================
             HẾT TÀI LIỆU
