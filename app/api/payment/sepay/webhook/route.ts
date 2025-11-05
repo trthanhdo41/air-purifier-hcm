@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // Extract order code từ nhiều nguồn có thể
     // Ưu tiên lấy từ field "code" (Sepay tự nhận diện)
     // Nếu không có thì extract từ "content" (nội dung chuyển khoản)
-    const orderCode = 
+    const rawOrderCode = 
       payload.code ||                          // Sepay tự nhận diện code thanh toán
       payload.order_code || 
       payload.orderCode ||
@@ -35,13 +35,15 @@ export async function POST(request: NextRequest) {
       extractOrderCode(payload.transferContent) ||
       extractOrderCode(payload.transaction_content);
 
-    if (!orderCode) {
+    if (!rawOrderCode) {
       console.error('❌ Order code not found in payload. Full payload:', payload);
       // Trả về success: true để Sepay không retry, nhưng không cập nhật đơn
       return NextResponse.json({ success: true, message: 'Order code not found, ignored' });
     }
 
-    console.log('✅ Order code extracted:', orderCode);
+    // Chuẩn hóa mã đơn về HTX-<digits>-<CODE>
+    const orderCode = normalizeOrderCode(rawOrderCode);
+    console.log('✅ Order code extracted:', { raw: rawOrderCode, normalized: orderCode });
 
     // Chỉ xử lý giao dịch TIỀN VÀO
     if (payload.transferType && payload.transferType !== 'in') {
@@ -53,16 +55,27 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Tìm order theo order_number
-    const { data: order, error: findError } = await supabase
+    let { data: order, error: findError } = await supabase
       .from('orders')
-      .select('id, order_number, total_amount, payment_status')
+      .select('id, order_number, total_amount, final_amount, payment_status')
       .eq('order_number', orderCode)
       .single();
 
     if (findError || !order) {
-      console.error('❌ Order not found:', orderCode, findError);
-      // Trả về success: true để Sepay ghi nhận đã xử lý webhook
-      return NextResponse.json({ success: true, message: 'Order not found, ignored' });
+      // Thử tìm theo biến thể không dấu (nếu đơn lưu sai format)
+      const noDashVariant = orderCode.replace(/-/g, '');
+      const retry = await supabase
+        .from('orders')
+        .select('id, order_number, total_amount, final_amount, payment_status')
+        .eq('order_number', noDashVariant)
+        .single();
+
+      if (retry.error || !retry.data) {
+        console.error('❌ Order not found with both variants:', { orderCode, noDashVariant, error: findError || retry.error });
+        // Trả về success để không retry nhưng log kỹ
+        return NextResponse.json({ success: true, message: 'Order not found with any variant, ignored' });
+      }
+      order = retry.data as any;
     }
 
     // Kiểm tra đơn hàng đã được thanh toán chưa (tránh duplicate)
@@ -76,9 +89,10 @@ export async function POST(request: NextRequest) {
 
     // Verify số tiền (optional, để đảm bảo chính xác)
     const receivedAmount = payload.amount || payload.transferAmount || payload.value || 0;
-    if (receivedAmount && Math.abs(receivedAmount - order.total_amount) > 1) {
+    const expectedAmount = (order.total_amount ?? order.final_amount ?? 0) as number;
+    if (receivedAmount && expectedAmount && Math.abs(receivedAmount - expectedAmount) > 1) {
       console.warn(
-        `⚠️ Amount mismatch: Expected ${order.total_amount}, got ${receivedAmount}`
+        `⚠️ Amount mismatch: Expected ${expectedAmount}, got ${receivedAmount}`
       );
     }
 
@@ -169,4 +183,22 @@ export async function GET() {
     status: 'active',
     timestamp: new Date().toISOString(),
   });
+}
+
+/**
+ * Chuẩn hóa mã đơn về HTX-<digits>-<CODE>
+ */
+function normalizeOrderCode(input: string): string {
+  if (!input) return input;
+  const trimmed = input.trim().toUpperCase();
+  // Nếu đã đúng định dạng
+  const m1 = trimmed.match(/^HTX-\d+-[A-Z0-9]+$/);
+  if (m1) return trimmed;
+  // Nếu không dấu gạch: HTX<digits><CODE>
+  const m2 = trimmed.match(/^HTX(\d+)([A-Z0-9]+)$/);
+  if (m2) return `HTX-${m2[1]}-${m2[2]}`;
+  // Nếu có khoảng trắng hoặc dấu gạch lộn xộn
+  const m3 = trimmed.match(/^HTX\s*-?\s*(\d+)\s*-?\s*([A-Z0-9]+)$/);
+  if (m3) return `HTX-${m3[1]}-${m3[2]}`;
+  return trimmed;
 }
