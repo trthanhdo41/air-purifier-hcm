@@ -182,12 +182,22 @@ export default function ProductCard({ product, index, compact = false }: Product
               e.stopPropagation();
               handleAddToCart(e);
             }}
-            className="relative z-10 w-full bg-sky-500 hover:bg-sky-600 text-white py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+            disabled={isAddingToCart}
+            className="relative z-10 w-full bg-sky-500 hover:bg-sky-600 text-white py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <ShoppingCart className="w-4 h-4" />
-            Thêm vào giỏ
+            {isAddingToCart ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Đang thêm...</span>
+              </>
+            ) : (
+              <>
+                <ShoppingCart className="w-4 h-4" />
+                Thêm vào giỏ
+              </>
+            )}
           </motion.button>
         </div>
         
@@ -359,16 +369,26 @@ export default function ProductCard({ product, index, compact = false }: Product
               e.stopPropagation();
               handleAddToCart(e);
             }}
-            className="w-full group-hover:shadow-xl-colored bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 transition-all"
+            disabled={isAddingToCart}
+            className="w-full group-hover:shadow-xl-colored bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             size="lg"
           >
-            <motion.div
-              animate={{ rotate: [0, -10, 10, -10, 10, 0] }}
-              transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 3 }}
-            >
-              <ShoppingCart className="w-4 h-4" />
-            </motion.div>
-            <span>Thêm vào giỏ</span>
+            {isAddingToCart ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Đang thêm...</span>
+              </>
+            ) : (
+              <>
+                <motion.div
+                  animate={{ rotate: [0, -10, 10, -10, 10, 0] }}
+                  transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 3 }}
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                </motion.div>
+                <span>Thêm vào giỏ</span>
+              </>
+            )}
           </Button>
         </motion.div>
 
