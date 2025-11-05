@@ -55,11 +55,19 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Tìm order theo order_number
+    // Thử tìm theo nhiều biến thể của mã đơn để tránh sai khác dấu gạch
+    const variants = Array.from(new Set([
+      orderCode,
+      orderCode.replace(/-/g, ''), // không dấu gạch
+      orderCode.replace(/-/g, '–'), // en dash
+      orderCode.replace(/-/g, '—'), // em dash
+    ]));
+
     let { data: order, error: findError } = await supabase
       .from('orders')
       .select('id, order_number, total_amount, final_amount, payment_status')
-      .eq('order_number', orderCode)
-      .single();
+      .in('order_number', variants)
+      .maybeSingle();
 
     if (findError || !order) {
       // Thử tìm theo biến thể không dấu (nếu đơn lưu sai format)
@@ -67,8 +75,8 @@ export async function POST(request: NextRequest) {
       const retry = await supabase
         .from('orders')
         .select('id, order_number, total_amount, final_amount, payment_status')
-        .eq('order_number', noDashVariant)
-        .single();
+        .in('order_number', [noDashVariant, noDashVariant.replace(/-/g, '–'), noDashVariant.replace(/-/g, '—')])
+        .maybeSingle();
 
       if (retry.error || !retry.data) {
         console.error('❌ Order not found with both variants:', { orderCode, noDashVariant, error: findError || retry.error });
