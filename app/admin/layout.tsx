@@ -74,16 +74,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="flex">
-        <aside className={`bg-slate-900 text-white transition-all duration-300 ease-in-out ${
+        <aside className={`bg-white border-r border-blue-100 shadow-lg transition-all duration-300 ease-in-out ${
           sidebarOpen ? 'w-64' : 'w-20'
         } fixed inset-y-0 z-30`}>
           <div className="flex flex-col h-full">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="p-4 border-b border-blue-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white">
               <div className="flex items-center gap-3">
                 {sidebarOpen ? (
                   <div className="w-36 h-10 flex items-center justify-center">
                     <img 
-                      src="/font/hoi-tho-xanh-white.svg" 
+                      src="/logo-hoi-tho-xanh.svg" 
                       alt="Hơi Thở Xanh" 
                       className="w-full h-full object-contain" 
                     />
@@ -91,7 +91,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 ) : (
                   <div className="w-10 h-10 flex items-center justify-center">
                     <img 
-                      src="/font/hoi-tho-xanh-white.svg" 
+                      src="/logo-hoi-tho-xanh.svg" 
                       alt="Hơi Thở Xanh" 
                       className="w-full h-full object-contain" 
                     />
@@ -100,7 +100,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </div>
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-2 hover:bg-blue-50 rounded-lg transition-colors text-gray-600 hover:text-blue-600"
               >
                 {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
@@ -119,8 +119,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     whileTap={{ scale: 0.98 }}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                       isActive
-                        ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md'
+                        : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
                     }`}
                   >
                     <Icon className="w-5 h-5 shrink-0" />
@@ -130,12 +130,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               })}
             </nav>
 
-            <div className="p-4 border-t border-slate-800">
+            <div className="p-4 border-t border-blue-100">
               <motion.button
                 onClick={handleSignOut}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all"
+                className="w-full flex items-center gap-3 px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-all"
               >
                 <LogOut className="w-5 h-5 shrink-0" />
                 {sidebarOpen && <span className="font-medium">Đăng xuất</span>}
