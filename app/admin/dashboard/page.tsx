@@ -130,6 +130,13 @@ export default function AdminDashboardPage() {
             backgroundColor: 'rgba(34, 197, 94, 0.1)',
             tension: 0.4,
             fill: true,
+            animation: {
+              y: {
+                from: 0,
+                duration: 2000,
+                easing: 'easeOutCubic',
+              },
+            },
           },
         ],
       },
@@ -141,6 +148,13 @@ export default function AdminDashboardPage() {
             data: ordersByDay,
             backgroundColor: 'rgba(59, 130, 246, 0.8)',
             borderRadius: 8,
+            animation: {
+              y: {
+                from: 0,
+                duration: 2000,
+                easing: 'easeOutCubic',
+              },
+            },
           },
         ],
       },
@@ -164,6 +178,13 @@ export default function AdminDashboardPage() {
             ],
             borderWidth: 2,
             borderColor: '#fff',
+            animation: {
+              scale: {
+                from: 0,
+                duration: 2000,
+                easing: 'easeOutCubic',
+              },
+            },
           },
         ],
       },
@@ -181,6 +202,13 @@ export default function AdminDashboardPage() {
               'rgba(239, 68, 68, 0.8)',
             ],
             borderRadius: 8,
+            animation: {
+              x: {
+                from: 0,
+                duration: 2000,
+                easing: 'easeOutCubic',
+              },
+            },
           },
         ],
       },
@@ -381,19 +409,22 @@ export default function AdminDashboardPage() {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: {
-                  duration: 2000, // Animation 2 giây khi vào trang
+                  duration: 2000,
                   easing: 'easeOutCubic' as any,
+                  onProgress: function(animation: any) {
+                    // Force animation from 0
+                    if (animation.currentStep === 0) {
+                      animation.chart.data.datasets.forEach((dataset: any) => {
+                        dataset._meta = dataset._meta || {};
+                      });
+                    }
+                  },
                 },
-                transitions: {
-                  show: {
-                    animations: {
-                      x: {
-                        from: 0,
-                      },
-                      y: {
-                        from: 0,
-                      },
-                    },
+                animations: {
+                  y: {
+                    from: 0,
+                    duration: 2000,
+                    easing: 'easeOutCubic' as any,
                   },
                 },
                 plugins: {
@@ -405,10 +436,12 @@ export default function AdminDashboardPage() {
                     enabled: true,
                     mode: 'index',
                     intersect: false,
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    position: 'average' as any,
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
                     padding: 12,
                     titleFont: { size: 14, weight: 'bold' },
                     bodyFont: { size: 13 },
+                    displayColors: false,
                     callbacks: {
                       label: function(context: any) {
                         return `Doanh thu: ${new Intl.NumberFormat('vi-VN').format(context.parsed.y)}đ`;
@@ -451,19 +484,14 @@ export default function AdminDashboardPage() {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: {
-                  duration: 2000, // Animation 2 giây khi vào trang
+                  duration: 2000,
                   easing: 'easeOutCubic' as any,
                 },
-                transitions: {
-                  show: {
-                    animations: {
-                      x: {
-                        from: 0,
-                      },
-                      y: {
-                        from: 0,
-                      },
-                    },
+                animations: {
+                  y: {
+                    from: 0,
+                    duration: 2000,
+                    easing: 'easeOutCubic' as any,
                   },
                 },
                 plugins: {
@@ -475,10 +503,12 @@ export default function AdminDashboardPage() {
                     enabled: true,
                     mode: 'index',
                     intersect: false,
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    position: 'average' as any,
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
                     padding: 12,
                     titleFont: { size: 14, weight: 'bold' },
                     bodyFont: { size: 13 },
+                    displayColors: false,
                     callbacks: {
                       title: function(context: any) {
                         return `Ngày ${context[0].label}`;
@@ -522,43 +552,40 @@ export default function AdminDashboardPage() {
                   responsive: true,
                   maintainAspectRatio: false,
                   animation: {
-                    duration: 2000, // Animation 2 giây khi vào trang
+                    duration: 2000,
                     easing: 'easeOutCubic' as any,
                   },
-                  transitions: {
-                    show: {
-                      animations: {
-                        x: {
-                          from: 0,
-                        },
-                        y: {
-                          from: 0,
+                  animations: {
+                    scale: {
+                      from: 0,
+                      duration: 2000,
+                      easing: 'easeOutCubic' as any,
+                    },
+                  },
+                  plugins: {
+                    legend: {
+                      display: true,
+                      position: 'right' as const,
+                    },
+                    tooltip: {
+                      enabled: true,
+                      position: 'average' as any,
+                      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                      padding: 12,
+                      titleFont: { size: 14, weight: 'bold' },
+                      bodyFont: { size: 13 },
+                      displayColors: false,
+                      callbacks: {
+                        label: function(context: any) {
+                          const label = context.label || '';
+                          const value = context.parsed || 0;
+                          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                          const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                          return `${label}: ${value} (${percentage}%)`;
                         },
                       },
                     },
                   },
-                    plugins: {
-                      legend: {
-                        display: true,
-                        position: 'right' as const,
-                      },
-                      tooltip: {
-                        enabled: true,
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        padding: 12,
-                        titleFont: { size: 14, weight: 'bold' },
-                        bodyFont: { size: 13 },
-                        callbacks: {
-                          label: function(context: any) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
-                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                            return `${label}: ${value} (${percentage}%)`;
-                          },
-                        },
-                      },
-                    },
                   }}
                 />
             </div>
@@ -579,19 +606,14 @@ export default function AdminDashboardPage() {
                   maintainAspectRatio: false,
                   indexAxis: 'y' as const, // Horizontal bar chart
                   animation: {
-                    duration: 2000, // Animation 2 giây khi vào trang
+                    duration: 2000,
                     easing: 'easeOutCubic' as any,
                   },
-                  transitions: {
-                    show: {
-                      animations: {
-                        x: {
-                          from: 0,
-                        },
-                        y: {
-                          from: 0,
-                        },
-                      },
+                  animations: {
+                    x: {
+                      from: 0,
+                      duration: 2000,
+                      easing: 'easeOutCubic' as any,
                     },
                   },
                   plugins: {
@@ -602,10 +624,12 @@ export default function AdminDashboardPage() {
                       enabled: true,
                       mode: 'index',
                       intersect: false,
-                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                      position: 'average' as any,
+                      backgroundColor: 'rgba(0, 0, 0, 0.85)',
                       padding: 12,
                       titleFont: { size: 14, weight: 'bold' },
                       bodyFont: { size: 13 },
+                      displayColors: false,
                       callbacks: {
                         title: function(context: any) {
                           return context[0].label || '';
