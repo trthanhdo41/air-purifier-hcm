@@ -517,7 +517,16 @@ export default function AdminDashboardPage() {
                     enabled: true,
                     mode: 'index',
                     intersect: true,
-                    position: 'nearest' as any,
+                    position: function(context: any) {
+                      // Custom position để tooltip hiển thị đúng vị trí chuột
+                      const point = context[0];
+                      const x = point.element.x;
+                      const y = point.element.y;
+                      return {
+                        x: x,
+                        y: y - 30, // Offset lên trên một chút
+                      };
+                    },
                     backgroundColor: 'rgba(0, 0, 0, 0.85)',
                     padding: 12,
                     titleFont: { size: 14, weight: 'bold' },
