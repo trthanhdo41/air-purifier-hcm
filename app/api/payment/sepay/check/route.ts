@@ -51,10 +51,25 @@ export async function GET(request: NextRequest) {
     const order = Array.isArray(orders) && orders.length > 0 ? orders[0] : null;
 
     if (error || !order) {
-      console.log('❌ Order not found:', { rawCode, normalized, variants, error: error?.message });
+      console.log('❌ Order not found by equality, try ilike contains:', { rawCode, normalized, variants, error: error?.message });
+      // Fallback: tìm theo chứa mã (đề phòng có khoảng trắng/dấu phát sinh)
+      const { data: fuzzyOrders, error: fuzzyErr } = await supabase
+        .from('orders')
+        .select('*')
+        .ilike('order_number', `%${normalized}%`)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const fuzzy = Array.isArray(fuzzyOrders) && fuzzyOrders.length > 0 ? fuzzyOrders[0] : null;
+      if (!fuzzy || fuzzyErr) {
+        return NextResponse.json({
+          success: true,
+          isPaid: false,
+        });
+      }
       return NextResponse.json({
         success: true,
-        isPaid: false,
+        isPaid: fuzzy.payment_status === 'paid',
+        order: fuzzy.payment_status === 'paid' ? fuzzy : null,
       });
     }
 

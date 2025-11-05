@@ -115,6 +115,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (!order) {
+      // Fallback 3: tìm "chứa" mã đơn
+      const { data: likeOrders, error: likeErr } = await supabase
+        .from('orders')
+        .select('id, order_number, total_amount, final_amount, payment_status, created_at')
+        .ilike('order_number', `%${orderCode}%`)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (!likeErr && Array.isArray(likeOrders) && likeOrders.length > 0) {
+        order = likeOrders[0] as any;
+      }
+    }
+
+    if (!order) {
       console.error('❌ Order not found with any strategy:', { orderCode, prefixDigits, suffixToken });
       return NextResponse.json({ success: true, message: 'Order lookup resulted in null' });
     }
