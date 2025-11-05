@@ -280,11 +280,44 @@ function extractOrderCode(content: string): any | null {
 }
 
 // Allow GET request để test webhook endpoint
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const testOrderCode = searchParams.get('testOrderCode');
+  
+  if (testOrderCode) {
+    // Test webhook với payload giống SEPay
+    const testPayload = {
+      gateway: "VPBank",
+      transactionDate: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      accountNumber: "0888889805",
+      subAccount: null,
+      code: null,
+      content: `NHAN TU 701888888 TRACE 285093 ND 106330722528-0888889805-${testOrderCode}`,
+      transferType: "in",
+      description: `BankAPINotify NHAN TU 701888888 TRACE 285093 ND 106330722528-0888889805-${testOrderCode}`,
+      transferAmount: 10000,
+      referenceCode: `FT${Date.now()}`,
+      accumulated: 0,
+      id: Math.floor(Math.random() * 100000000),
+    };
+    
+    // Gọi POST handler với test payload
+    const testRequest = new NextRequest(request.url, {
+      method: 'POST',
+      body: JSON.stringify(testPayload),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    return POST(testRequest);
+  }
+  
   return NextResponse.json({
     message: 'Sepay Webhook Endpoint',
     status: 'active',
     timestamp: new Date().toISOString(),
+    test: 'Add ?testOrderCode=HTX##### to test webhook',
   });
 }
 
