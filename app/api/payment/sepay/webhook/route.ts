@@ -200,7 +200,8 @@ export async function POST(request: NextRequest) {
       .from('orders')
       .update({
         payment_status: 'paid',
-        status: 'processing',
+        // Giữ status = 'pending' khi đã thanh toán, admin sẽ chuyển sang 'processing' khi bắt đầu xử lý
+        status: 'pending',
         transaction_id: transactionId,
         updated_at: new Date().toISOString(),
       })
@@ -335,12 +336,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify status cũng phải là 'processing'
-    if (verifyOrder.status !== 'processing') {
-      console.error('❌ CRITICAL: Order status not updated to processing!', {
+    // Verify status phải là 'pending' (chờ xử lý sau khi đã thanh toán)
+    // Admin sẽ chuyển sang 'processing' khi bắt đầu xử lý đơn hàng
+    if (verifyOrder.status !== 'pending') {
+      console.error('❌ CRITICAL: Order status should be pending after payment!', {
         order_id: order.id,
         order_number: order.order_number,
-        expected: 'processing',
+        expected: 'pending',
         actual: verifyOrder.status,
         updated_data_status: updatedOrder?.status,
         verified_data: verifyOrder,
@@ -350,9 +352,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Order status not updated to processing',
+          error: 'Order status should be pending after payment',
           details: {
-            expected: 'processing',
+            expected: 'pending',
             actual: verifyOrder.status,
             updated_data: updatedOrder,
             verified_data: verifyOrder,
