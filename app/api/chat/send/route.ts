@@ -127,22 +127,29 @@ export async function POST(request: NextRequest) {
       .limit(10);
 
     // Build conversation history
-    const conversationHistory = chatHistory
-      ?.reverse()
-      .map(msg => ({
-        role: 'user' as const,
-        parts: [{ text: msg.message }],
-      }))
-      .concat(
-        chatHistory?.map(msg => ({
-          role: 'model' as const,
+    type ConversationItem = 
+      | { role: 'user'; parts: Array<{ text: string }> }
+      | { role: 'model'; parts: Array<{ text: string }> };
+
+    const conversationHistory: ConversationItem[] = [];
+
+    // Add previous messages (user and model responses)
+    if (chatHistory && chatHistory.length > 0) {
+      for (const msg of chatHistory.reverse()) {
+        conversationHistory.push({
+          role: 'user',
+          parts: [{ text: msg.message }],
+        });
+        conversationHistory.push({
+          role: 'model',
           parts: [{ text: msg.response }],
-        })) || []
-      ) || [];
+        });
+      }
+    }
 
     // Add current message
     conversationHistory.push({
-      role: 'user' as const,
+      role: 'user',
       parts: [{ text: message }],
     });
 
