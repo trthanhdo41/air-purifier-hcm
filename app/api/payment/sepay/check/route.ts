@@ -107,20 +107,54 @@ export async function GET(request: NextRequest) {
 
     if (!order) {
       console.error('❌ Check API - Order not found with any strategy:', { rawCode, normalized, variants });
-      return NextResponse.json(
-        {
-          success: true,
-          isPaid: false,
-          ...(debug ? { debug: { rawCode, normalized, variants, found: 0 } } : {}),
-        },
-        {
-          headers: {
-            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-            'Pragma': 'no-cache',
-            'Expires': '0',
+      
+      // Thử query trực tiếp bằng order_number chính xác (không dùng variants)
+      console.log('🔍 Check API - Trying direct query with rawCode:', rawCode);
+      const { data: directOrders, error: directError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('order_number', rawCode.trim())
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      const directOrder = Array.isArray(directOrders) && directOrders.length > 0 ? directOrders[0] : null;
+      
+      if (directOrder) {
+        console.log('✅ Check API - Order found via direct query:', {
+          order_number: directOrder.order_number,
+          payment_status: directOrder.payment_status,
+          status: directOrder.status,
+        });
+        order = directOrder;
+      } else {
+        console.error('❌ Check API - Direct query also failed:', { 
+          rawCode: rawCode.trim(), 
+          error: directError?.message,
+          found: directOrders?.length || 0,
+        });
+        
+        return NextResponse.json(
+          {
+            success: true,
+            isPaid: false,
+            order: null,
+            debug: {
+              rawCode,
+              normalized,
+              variants,
+              found: 0,
+              message: 'Order not found in Supabase',
+            },
           },
-        }
-      );
+          {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+            },
+          }
+        );
+      }
     }
 
     // Check nếu đã thanh toán
@@ -136,23 +170,23 @@ export async function GET(request: NextRequest) {
       order_id: order.id,
     });
 
+    // TRẢ VỀ ORDER NGAY CẢ KHI CHƯA PAID để FE có thể debug
     return NextResponse.json(
       {
         success: true,
         isPaid,
-        order: isPaid ? order : null,
-        ...(debug ? { 
-          debug: { 
-            rawCode, 
-            normalized, 
-            variants, 
-            found: 1, 
-            matched: order.order_number,
-            payment_status: order.payment_status,
-            status: order.status,
-            order_id: order.id,
-          } 
-        } : {}),
+        order: order, // Trả về order ngay cả khi chưa paid
+        payment_status: order.payment_status, // Thêm payment_status riêng để dễ debug
+        debug: {
+          rawCode,
+          normalized,
+          variants,
+          found: 1,
+          matched: order.order_number,
+          payment_status: order.payment_status,
+          status: order.status,
+          order_id: order.id,
+        },
       },
       {
         headers: {
