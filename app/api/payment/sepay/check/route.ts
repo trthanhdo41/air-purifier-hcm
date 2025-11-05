@@ -33,6 +33,15 @@ export async function GET(request: NextRequest) {
     // DÙNG SERVICE_ROLE_KEY để bypass RLS (API routes không có user session)
     // Admin page: dùng ANON_KEY VÌ user đã đăng nhập
     // Check API: dùng SERVICE_ROLE_KEY để bypass RLS vì không có user session
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    console.log('🔌 Check API - Supabase Config:', {
+      url: supabaseUrl,
+      hasServiceKey: !!serviceKey,
+      serviceKeyPrefix: serviceKey?.substring(0, 20) + '...',
+    });
+    
     const supabase = createAdminClient();
     
     console.log('🔌 Check API - Using SERVICE_ROLE_KEY to bypass RLS (no user session in API route)');
