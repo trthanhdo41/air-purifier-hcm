@@ -512,22 +512,31 @@ export default function AdminDashboardPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2"
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
           >
             <h2 className="text-lg font-bold text-gray-900 mb-4">Phân bố trạng thái đơn hàng</h2>
-            <div className="flex items-center justify-center">
-              <div className="w-full max-w-md" style={{ height: '300px', position: 'relative' }}>
-                <Doughnut
-                  data={chartData.statusChart}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: {
-                      duration: 1500, // Animation 1.5 giây khi vào trang
-                      easing: 'easeOutQuart' as any,
-                      onProgress: function() {},
-                      onComplete: function() {},
+            <div style={{ height: '250px', position: 'relative' }}>
+              <Doughnut
+                data={chartData.statusChart}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  animation: {
+                    duration: 2000, // Animation 2 giây khi vào trang
+                    easing: 'easeOutCubic' as any,
+                  },
+                  transitions: {
+                    show: {
+                      animations: {
+                        x: {
+                          from: 0,
+                        },
+                        y: {
+                          from: 0,
+                        },
+                      },
                     },
+                  },
                     plugins: {
                       legend: {
                         display: true,
@@ -552,7 +561,6 @@ export default function AdminDashboardPage() {
                     },
                   }}
                 />
-              </div>
             </div>
           </motion.div>
 
@@ -571,10 +579,20 @@ export default function AdminDashboardPage() {
                   maintainAspectRatio: false,
                   indexAxis: 'y' as const, // Horizontal bar chart
                   animation: {
-                    duration: 1500, // Animation 1.5 giây khi vào trang
-                    easing: 'easeOutQuart' as any,
-                    onProgress: function() {},
-                    onComplete: function() {},
+                    duration: 2000, // Animation 2 giây khi vào trang
+                    easing: 'easeOutCubic' as any,
+                  },
+                  transitions: {
+                    show: {
+                      animations: {
+                        x: {
+                          from: 0,
+                        },
+                        y: {
+                          from: 0,
+                        },
+                      },
+                    },
                   },
                   plugins: {
                     legend: {
